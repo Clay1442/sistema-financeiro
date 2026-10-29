@@ -68,6 +68,13 @@ export default function LoginScreen({ navigation }: any) {
         <Text style={styles.label}>Manter conectado</Text>
         <Switch value={manterConectado} onValueChange={setManterConectado} />
       </View>
+      
+      <TouchableOpacity 
+        style={{ alignItems: 'flex-end', marginBottom: 24 }} 
+        onPress={() => navigation.navigate('EsqueciSenha')}
+      >
+        <Text style={{ color: '#3B82F6', fontSize: 14, fontWeight: '600' }}>Esqueci minha senha</Text>
+      </TouchableOpacity>
 
       <TouchableOpacity style={styles.btnPrincipal} onPress={handleLoginTradicional}>
         <Text style={styles.btnText}>Entrar</Text>
@@ -75,9 +82,12 @@ export default function LoginScreen({ navigation }: any) {
 
       {suportaBiometria && (
         <TouchableOpacity style={styles.btnBiometria} onPress={handleLoginBiometria}>
-          <Text style={styles.btnBiometriaText}>👆 Entrar com Biometria / Digital</Text>
+          <Text style={styles.btnBiometriaText}>Entrar com Biometria / Digital</Text>
         </TouchableOpacity>
       )}
+      <TouchableOpacity style={styles.btnBiometria} onPress={() => navigation.navigate('Step1Basico')}>
+        <Text style={styles.btnBiometriaText}>Cadastre-se</Text>
+      </TouchableOpacity>
     </View>
   );
 }

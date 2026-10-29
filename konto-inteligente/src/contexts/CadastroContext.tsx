@@ -6,7 +6,6 @@ interface CadastroState {
   nome: string;
   email: string;
   senha: string;
-  pin: string;
   tipoConta: TipoConta;
 }
 
@@ -20,7 +19,7 @@ const CadastroContext = createContext<CadastroContextData>({} as CadastroContext
 
 export const CadastroProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
   const [dados, setDados] = useState<CadastroState>({
-    nome: '', email: '', senha: '', pin: '', tipoConta: 'PF'
+    nome: '', email: '', senha: '', tipoConta: 'PF'
   });
 
   const atualizarDados = (novosDados: Partial<CadastroState>) => {
@@ -28,7 +27,7 @@ export const CadastroProvider: React.FC<{children: React.ReactNode}> = ({ childr
   };
 
   const limparDados = () => {
-    setDados({ nome: '', email: '', senha: '', pin: '', tipoConta: 'PF' });
+    setDados({ nome: '', email: '', senha: '', tipoConta: 'PF' });
   };
 
   return (

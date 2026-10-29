@@ -3,23 +3,27 @@ import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet } from 'reac
 import { useCadastro } from '../contexts/CadastroContext';
 
 export default function Step1BasicoScreen({ navigation }: any) {
-  // Puxa os dados do contexto. Assim, se o usuário for para a tela 2 e clicar em "Voltar", 
-  // os campos não ficam vazios, os dados ainda estarão aqui.
   const { dados, atualizarDados } = useCadastro();
   
   const [nome, setNome] = useState(dados.nome);
   const [email, setEmail] = useState(dados.email);
   const [senha, setSenha] = useState(dados.senha);
+  const [confirmaSenha, setConfirmaSenha] = useState('');
 
   const handleContinuar = () => {
-    if (!nome || !email || !senha) {
+    if (!nome || !email || !senha || !confirmaSenha) {
       return Alert.alert('Atenção', 'Preencha todos os campos para continuar.');
     }
     
-    // Salva no contexto global
-    atualizarDados({ nome, email, senha });
+    if (senha !== confirmaSenha) {
+      return Alert.alert('Atenção', 'As senhas não coincidem. Digite novamente.');
+    }
+
+    if (senha.length < 6) {
+      return Alert.alert('Segurança', 'Sua senha deve ter pelo menos 6 caracteres.');
+    }
     
-    // Avança para a Etapa 2
+    atualizarDados({ nome, email, senha });
     navigation.navigate('Step2Seguranca');
   };
 
@@ -43,13 +47,21 @@ export default function Step1BasicoScreen({ navigation }: any) {
         value={email} 
         onChangeText={setEmail} 
       />
-      
+
       <TextInput 
         style={styles.input} 
-        placeholder="Senha" 
+        placeholder="Senha (mínimo 6 caracteres)" 
         secureTextEntry 
         value={senha} 
         onChangeText={setSenha} 
+      />
+      
+      <TextInput 
+        style={styles.input} 
+        placeholder="Confirme sua Senha" 
+        secureTextEntry 
+        value={confirmaSenha} 
+        onChangeText={setConfirmaSenha} 
       />
 
       <TouchableOpacity style={styles.btnPrincipal} onPress={handleContinuar}>

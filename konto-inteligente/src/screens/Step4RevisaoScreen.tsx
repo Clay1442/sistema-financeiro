@@ -12,15 +12,16 @@ export default function Step4RevisaoScreen({ navigation }: any) {
   const handleFinalizar = async () => {
     setLoading(true);
     try {
-      // 1. Criptografar Senha e PIN localmente (SHA-256) para NUNCA salvar em texto puro
+      // 1. Criptografar Senha localmente
       const hashSenha = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, dados.senha);
-      const hashPin = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, dados.pin);
 
-      // 2. Criar Usuário
+      // 2. Criar Usuário (SEM O PIN)
       const { data: usuario, error: errUser } = await supabase.from('usuarios')
         .insert([{ 
-          nome: dados.nome, email: dados.email, 
-          senha: hashSenha, pin_acesso: hashPin, tipo_conta: dados.tipoConta 
+          nome: dados.nome, 
+          email: dados.email, 
+          senha: hashSenha, 
+          tipo_conta: dados.tipoConta 
         }]).select().single();
       
       if (errUser) throw new Error(errUser.message);
@@ -34,15 +35,13 @@ export default function Step4RevisaoScreen({ navigation }: any) {
         perfisParaCriar.push({ usuario_id: usuario.id, tipo: 'EMPRESARIAL', nome: 'Meu Negócio' });
       }
 
-      const { data: perfis, error: errPerfis } = await supabase.from('perfis_financeiros')
-        .insert(perfisParaCriar).select();
+      const { error: errPerfis } = await supabase.from('perfis_financeiros').insert(perfisParaCriar);
       if (errPerfis) throw new Error(errPerfis.message);
 
-      // 4. Salvar sessão local criptografada (O recurso de "Manter Conectado")
+      // 4. Salvar sessão local criptografada (Auto-login)
       await SecureStore.setItemAsync('userToken', usuario.id.toString());
       await SecureStore.setItemAsync('manterConectado', 'true');
 
-      // Limpa a memória do formulário e manda direto pro Dashboard (Auto-login)
       limparDados();
       navigation.reset({ index: 0, routes: [{ name: 'Dashboard' }] });
 
@@ -58,14 +57,19 @@ export default function Step4RevisaoScreen({ navigation }: any) {
       <Text style={styles.title}>Revisão do Cadastro</Text>
       
       <View style={styles.cardResumo}>
-        <Text style={styles.label}>Nome:</Text><Text style={styles.value}>{dados.nome}</Text>
-        <Text style={styles.label}>E-mail:</Text><Text style={styles.value}>{dados.email}</Text>
+        <Text style={styles.label}>Nome:</Text>
+        <Text style={styles.value}>{dados.nome}</Text>
+        
+        <Text style={styles.label}>E-mail:</Text>
+        <Text style={styles.value}>{dados.email}</Text>
+        
         <Text style={styles.label}>Perfil Escolhido:</Text>
         <Text style={styles.value}>
           {dados.tipoConta === 'PF' ? 'Pessoal' : dados.tipoConta === 'PJ' ? 'Empresarial' : 'Compartilhado'}
         </Text>
+        
         <Text style={styles.label}>Segurança:</Text>
-        <Text style={styles.value}>PIN de 4 dígitos configurado 🔒</Text>
+        <Text style={styles.value}>Biometria ativada 🔒</Text>
       </View>
 
       <TouchableOpacity style={styles.btnPrincipal} onPress={handleFinalizar} disabled={loading}>
@@ -75,12 +79,13 @@ export default function Step4RevisaoScreen({ navigation }: any) {
   );
 }
 
+// Estilos
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24, backgroundColor: '#F9FAFB' },
-  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 24 },
-  cardResumo: { backgroundColor: '#FFF', padding: 20, borderRadius: 12, marginBottom: 32 },
+  container: { flex: 1, padding: 24, backgroundColor: '#F9FAFB', justifyContent: 'center' },
+  title: { fontSize: 28, fontWeight: 'bold', marginBottom: 24, color: '#111827' },
+  cardResumo: { backgroundColor: '#FFF', padding: 20, borderRadius: 12, marginBottom: 32, borderWidth: 1, borderColor: '#E5E7EB' },
   label: { fontSize: 14, color: '#6B7280', marginTop: 12 },
-  value: { fontSize: 18, fontWeight: '600', color: '#111827' },
+  value: { fontSize: 18, fontWeight: '600', color: '#111827', marginBottom: 4 },
   btnPrincipal: { backgroundColor: '#10B981', padding: 16, borderRadius: 8, alignItems: 'center' },
   btnText: { color: '#FFF', fontSize: 18, fontWeight: 'bold' }
 });

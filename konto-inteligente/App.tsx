@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'; 
-import { View, ActivityIndicator } from 'react-native';
+import { View, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as SecureStore from 'expo-secure-store';
@@ -12,13 +12,45 @@ import Step1BasicoScreen from './src/screens/Step1BasicoScreen';
 import Step2SegurancaScreen from './src/screens/Step2SegurancaScreen';
 import Step3PerfilScreen from './src/screens/Step3PerfilScreen';
 import Step4RevisaoScreen from './src/screens/Step4RevisaoScreen';
+import EsqueciSenhaScreen from './src/screens/EsqueciSenhaScreen';
 
 // Mock rápido do Dashboard para o App não quebrar ao finalizar o cadastro ou login
 import { Text } from 'react-native';
-function DashboardScreen() {
+function DashboardScreen({ navigation }: any) {
+  const handleLogout = async () => {
+    try {
+      // 1. Apaga os dados de sessão salvos localmente no celular
+      await SecureStore.deleteItemAsync('userToken');
+      await SecureStore.deleteItemAsync('manterConectado');
+      
+      // 2. Redireciona o usuário para a tela Welcome e apaga o histórico de navegação
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Welcome' }],
+      });
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível fazer logout.');
+    }
+  };
+
   return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <Text style={{ fontSize: 24, fontWeight: 'bold' }}>Painel Principal 🚀</Text>
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F9FAFB' }}>
+      <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#111827', marginBottom: 32 }}>Painel Principal</Text>
+      
+      {/* Botão de Logout Temporário */}
+      <TouchableOpacity 
+        onPress={handleLogout}
+        style={{ 
+          backgroundColor: '#EF4444', // Cor vermelha para indicar saída/alerta
+          paddingVertical: 12, 
+          paddingHorizontal: 24, 
+          borderRadius: 8 
+        }}
+      >
+        <Text style={{ color: '#FFF', fontSize: 16, fontWeight: 'bold' }}>
+          Sair da Conta (Logout)
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -71,6 +103,7 @@ export default function App() {
           {/* Entradas do App */}
           <Stack.Screen name="Welcome" component={WelcomeScreen} />
           <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="EsqueciSenha" component={EsqueciSenhaScreen} />
 
           {/* O Fluxo Wizard do Cadastro em Etapas */}
           <Stack.Screen name="Step1Basico" component={Step1BasicoScreen} />
