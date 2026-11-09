@@ -1,88 +1,113 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { FontAwesome5 } from '@expo/vector-icons';
 import { useCadastro } from '../contexts/CadastroContext';
-
-type TipoConta = 'PF' | 'PJ' | 'PF_PJ';
 
 export default function Step3PerfilScreen({ navigation }: any) {
   const { dados, atualizarDados } = useCadastro();
-  const [perfilSelecionado, setPerfilSelecionado] = useState<TipoConta>(dados.tipoConta || 'PF');
+  const [perfilSelecionado, setPerfilSelecionado] = useState<'PF' | 'PJ' | 'PF_PJ' | null>(dados?.tipoConta || null);
 
   const handleContinuar = () => {
-    // Salva a escolha do perfil no contexto
+    if (!perfilSelecionado) {
+      return Alert.alert('Atenção', 'Escolha o seu perfil financeiro antes de continuar.');
+    }
     atualizarDados({ tipoConta: perfilSelecionado });
-    
-    // Avança para a Etapa 4 (Revisão e Salvar no banco)
     navigation.navigate('Step4Revisao');
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.step}>Etapa 3 de 4</Text>
-      <Text style={styles.title}>Perfil Financeiro</Text>
-      <Text style={styles.subtitle}>Como você pretende usar o aplicativo?</Text>
-
-      {/* Card: Apenas Pessoal */}
-      <TouchableOpacity 
-        style={[styles.card, perfilSelecionado === 'PF' && styles.cardAtivo]}
-        onPress={() => setPerfilSelecionado('PF')}
-      >
-        <Text style={styles.cardIcon}>👤</Text>
-        <View style={styles.cardContent}>
-          <Text style={styles.cardTitle}>Perfil Pessoal</Text>
-          <Text style={styles.cardDesc}>Apenas para organizar meus gastos de casa e vida pessoal.</Text>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.content}>
+        
+        {/* LOGO */}
+        <View style={styles.header}>
+          <View style={styles.logoContainer}>
+            <Image source={require('../../assets/logo.png')} style={styles.logoImage} resizeMode="contain" />
+            <Text style={styles.logoText}>Konto</Text>
+          </View>
         </View>
-      </TouchableOpacity>
 
-      {/* Card: Apenas Empresarial */}
-      <TouchableOpacity 
-        style={[styles.card, perfilSelecionado === 'PJ' && styles.cardAtivo]}
-        onPress={() => setPerfilSelecionado('PJ')}
-      >
-        <Text style={styles.cardIcon}>🏢</Text>
-        <View style={styles.cardContent}>
-          <Text style={styles.cardTitle}>Perfil Empresarial</Text>
-          <Text style={styles.cardDesc}>Apenas para gerenciar o caixa, receitas e despesas da minha empresa.</Text>
+        <Text style={styles.title}>Escolha seu perfil financeiro</Text>
+
+        {/* CÍRCULOS DE SELEÇÃO */}
+        <View style={styles.rowPerfis}>
+          
+          {/* Pessoa Física */}
+          <TouchableOpacity style={styles.btnPerfil} onPress={() => setPerfilSelecionado('PF')}>
+            <View style={[styles.circle, perfilSelecionado === 'PF' ? styles.circleAtivo : styles.circleInativo]}>
+              <FontAwesome5 name="user-alt" size={24} color={perfilSelecionado === 'PF' ? "#FFF" : "#0F172A"} />
+            </View>
+            <Text style={styles.perfilLabel}>Pessoa {'\n'}Física {'\n'}PF</Text>
+          </TouchableOpacity>
+
+          {/* Pessoa Jurídica */}
+          <TouchableOpacity style={styles.btnPerfil} onPress={() => setPerfilSelecionado('PJ')}>
+            <View style={[styles.circle, perfilSelecionado === 'PJ' ? styles.circleAtivo : styles.circleInativo]}>
+              <FontAwesome5 name="user-tie" size={24} color={perfilSelecionado === 'PJ' ? "#FFF" : "#0F172A"} />
+            </View>
+            <Text style={styles.perfilLabel}>Pessoa {'\n'}Jurídica {'\n'}PJ</Text>
+          </TouchableOpacity>
+
+          {/* Ambos */}
+          <TouchableOpacity style={styles.btnPerfil} onPress={() => setPerfilSelecionado('PF_PJ')}>
+            <View style={[styles.circle, perfilSelecionado === 'PF_PJ' ? styles.circleAtivo : styles.circleInativo]}>
+              <FontAwesome5 name="users" size={24} color={perfilSelecionado === 'PF_PJ' ? "#FFF" : "#0F172A"} />
+            </View>
+            <Text style={styles.perfilLabel}>Pessoa Física {'\n'}e Jurídica {'\n'}PF e PJ</Text>
+          </TouchableOpacity>
+
         </View>
-      </TouchableOpacity>
 
-      {/* Card: Compartilhado (Ambos) */}
-      <TouchableOpacity 
-        style={[styles.card, perfilSelecionado === 'PF_PJ' && styles.cardAtivo]}
-        onPress={() => setPerfilSelecionado('PF_PJ')}
-      >
-        <Text style={styles.cardIcon}>🔄</Text>
-        <View style={styles.cardContent}>
-          <Text style={styles.cardTitle}>Perfil Compartilhado</Text>
-          <Text style={styles.cardDesc}>Quero os dois. Gerenciar minha empresa e minha vida pessoal no mesmo app, mas sem misturar o dinheiro.</Text>
+        {/* BOTÃO CONTINUAR */}
+        <TouchableOpacity onPress={handleContinuar}>
+          <LinearGradient 
+            colors={['#0F172A', '#1D4ED8', '#3B82F6']} 
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={styles.btnGradient}
+          >
+            <Text style={styles.btnText}>Continuar</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+
+        {/* LINK VOLTAR */}
+        <View style={styles.footer}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Text style={styles.linkTextDark}>
+              <Text style={{ color: '#9CA3AF' }}>❮</Text> Voltar
+            </Text>
+          </TouchableOpacity>
         </View>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.btnPrincipal} onPress={handleContinuar}>
-        <Text style={styles.btnText}>Continuar</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.btnVoltar} onPress={() => navigation.goBack()}>
-        <Text style={styles.btnVoltarText}>Voltar</Text>
-      </TouchableOpacity>
-    </ScrollView>
+        
+      </View>
+    </SafeAreaView>
   );
 }
 
-// Estilos
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, padding: 24, backgroundColor: '#F9FAFB', justifyContent: 'center' },
-  step: { fontSize: 14, color: '#3B82F6', marginBottom: 8, fontWeight: 'bold', textTransform: 'uppercase' },
-  title: { fontSize: 28, fontWeight: 'bold', marginBottom: 8, color: '#111827' },
-  subtitle: { fontSize: 16, color: '#4B5563', marginBottom: 32 },
-  card: { flexDirection: 'row', backgroundColor: '#FFF', borderWidth: 2, borderColor: '#E5E7EB', borderRadius: 12, padding: 16, marginBottom: 16, alignItems: 'center' },
-  cardAtivo: { borderColor: '#10B981', backgroundColor: '#ECFDF5' }, // Fica verdinho quando selecionado
-  cardIcon: { fontSize: 32, marginRight: 16 },
-  cardContent: { flex: 1 },
-  cardTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827', marginBottom: 4 },
-  cardDesc: { fontSize: 14, color: '#4B5563', lineHeight: 20 },
-  btnPrincipal: { backgroundColor: '#10B981', padding: 16, borderRadius: 8, alignItems: 'center', marginTop: 16 },
-  btnText: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
-  btnVoltar: { padding: 16, alignItems: 'center', marginTop: 8 },
-  btnVoltarText: { color: '#6B7280', fontSize: 16, fontWeight: 'bold' }
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  content: { flex: 1, paddingHorizontal: 32, justifyContent: 'center' },
+  
+  header: { alignItems: 'center', marginBottom: 40 },
+  logoContainer: { flexDirection: 'row', alignItems: 'center' },
+  logoImage: { width: 44, height: 44, marginRight: 8 },
+  logoText: { fontSize: 40, fontWeight: '900', color: '#0F172A', letterSpacing: -1 },
+  
+  title: { fontSize: 20, color: '#1D4ED8', fontWeight: '800', textAlign: 'center', marginBottom: 32 },
+  
+  rowPerfis: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 40 },
+  btnPerfil: { alignItems: 'center', flex: 1 },
+  
+  circle: { width: 72, height: 72, borderRadius: 36, justifyContent: 'center', alignItems: 'center', marginBottom: 12, borderWidth: 2 },
+  circleInativo: { backgroundColor: '#F8FAFC', borderColor: '#0F172A' },
+  circleAtivo: { backgroundColor: '#1D4ED8', borderColor: '#1D4ED8' },
+  
+  perfilLabel: { fontSize: 12, fontWeight: '800', color: '#0F172A', textAlign: 'center' },
+  
+  btnGradient: { height: 56, borderRadius: 30, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+  btnText: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold' },
+  
+  footer: { alignItems: 'center', marginTop: 12 },
+  linkTextDark: { color: '#0F172A', fontSize: 14, fontWeight: '700' }
 });

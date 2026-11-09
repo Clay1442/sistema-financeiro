@@ -1,42 +1,77 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function Step2SegurancaScreen({ navigation }: any) {
-  
   return (
-    <View style={styles.container}>
-      <Text style={styles.step}>Etapa 2 de 4</Text>
-      <Text style={styles.title}>Segurança e Acesso</Text>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.content}>
+        
+        {/* LOGO E TÍTULO */}
+        <View style={styles.header}>
+          <View style={styles.logoContainer}>
+            <Image source={require('../../assets/logo.png')} style={styles.logoImage} resizeMode="contain" />
+            <Text style={styles.logoText}>Konto</Text>
+          </View>
+          <Text style={styles.subtitle}>Segurança em primeiro lugar</Text>
+        </View>
 
-      <View style={styles.biometriaCard}>
-        <Text style={styles.biometriaTitle}>👆 Acesso Inteligente</Text>
-        <Text style={styles.biometriaDesc}>
-          Nosso aplicativo possui suporte integrado para FaceID e Leitor de Impressão Digital. 
-          {'\n\n'}
-          Após concluir o cadastro, você não precisará digitar sua senha toda vez que abrir o app. Basta usar a biometria do seu próprio celular de forma rápida e segura!
-        </Text>
+        <View style={styles.form}>
+          <View style={styles.biometriaCard}>
+            <MaterialCommunityIcons name="fingerprint" size={64} color="#1D4ED8" style={{ marginBottom: 16 }} />
+            <Text style={styles.biometriaTitle}>Acesso Inteligente</Text>
+            <Text style={styles.biometriaDesc}>
+              O nosso aplicativo suporta FaceID e Leitura de Impressão Digital.{'\n\n'}
+              Após criar a conta, poderá acessar rapidamente usando a biometria do seu dispositivo, sem precisar de digitar a senha novamente.
+            </Text>
+          </View>
+
+          {/* BOTÃO CONTINUAR */}
+          <TouchableOpacity onPress={() => navigation.navigate('Step3Perfil')}>
+            <LinearGradient 
+              colors={['#0F172A', '#1D4ED8', '#3B82F6']} 
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={styles.btnGradient}
+            >
+              <Text style={styles.btnText}>Entendi, Continuar</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          {/* LINK VOLTAR */}
+          <View style={styles.footer}>
+            <TouchableOpacity onPress={() => navigation.goBack()}>
+              <Text style={styles.linkTextDark}>
+                <Text style={{ color: '#9CA3AF' }}>❮</Text> Voltar
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+        
       </View>
-
-      <TouchableOpacity style={styles.btnPrincipal} onPress={() => navigation.navigate('Step3Perfil')}>
-        <Text style={styles.btnText}>Entendi, Continuar</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.btnVoltar} onPress={() => navigation.goBack()}>
-        <Text style={styles.btnVoltarText}>Voltar</Text>
-      </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24, backgroundColor: '#F9FAFB', justifyContent: 'center' },
-  step: { fontSize: 14, color: '#3B82F6', marginBottom: 8, fontWeight: 'bold', textTransform: 'uppercase' },
-  title: { fontSize: 28, fontWeight: 'bold', marginBottom: 24, color: '#111827' },
-  biometriaCard: { backgroundColor: '#EFF6FF', padding: 20, borderRadius: 12, marginBottom: 32, borderWidth: 1, borderColor: '#BFDBFE' },
-  biometriaTitle: { fontSize: 18, fontWeight: 'bold', color: '#1E40AF', marginBottom: 12 },
-  biometriaDesc: { fontSize: 16, color: '#1E3A8A', lineHeight: 24 },
-  btnPrincipal: { backgroundColor: '#10B981', padding: 16, borderRadius: 8, alignItems: 'center' },
-  btnText: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
-  btnVoltar: { padding: 16, alignItems: 'center', marginTop: 8 },
-  btnVoltarText: { color: '#6B7280', fontSize: 16, fontWeight: 'bold' }
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  content: { flex: 1, paddingHorizontal: 32, justifyContent: 'center' },
+  
+  header: { alignItems: 'center', marginBottom: 40 },
+  logoContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  logoImage: { width: 44, height: 44, marginRight: 8 },
+  logoText: { fontSize: 40, fontWeight: '900', color: '#0F172A', letterSpacing: -1 },
+  subtitle: { fontSize: 16, color: '#0F172A', fontWeight: '800' },
+  
+  form: { marginBottom: 20 },
+  biometriaCard: { alignItems: 'center', backgroundColor: '#F8FAFC', padding: 24, borderRadius: 24, borderWidth: 2, borderColor: '#E2E8F0', marginBottom: 32 },
+  biometriaTitle: { fontSize: 20, fontWeight: '900', color: '#0F172A', marginBottom: 12 },
+  biometriaDesc: { fontSize: 14, color: '#475569', lineHeight: 22, textAlign: 'center', fontWeight: '500' },
+  
+  btnGradient: { height: 56, borderRadius: 30, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+  btnText: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold' },
+  
+  footer: { alignItems: 'center', marginTop: 12 },
+  linkTextDark: { color: '#0F172A', fontSize: 14, fontWeight: '700' }
 });

@@ -6,6 +6,8 @@ import * as SecureStore from 'expo-secure-store';
 
 import { CadastroProvider } from './src/contexts/CadastroContext';
 
+import NovaTransacaoScreen from './src/screens/NovaTransacaoScreen';
+import GerenciarCategoriasScreen from './src/screens/GerenciarCategoriasScreen';
 import WelcomeScreen from './src/screens/WelcomeScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import Step1BasicoScreen from './src/screens/Step1BasicoScreen';
@@ -13,47 +15,9 @@ import Step2SegurancaScreen from './src/screens/Step2SegurancaScreen';
 import Step3PerfilScreen from './src/screens/Step3PerfilScreen';
 import Step4RevisaoScreen from './src/screens/Step4RevisaoScreen';
 import EsqueciSenhaScreen from './src/screens/EsqueciSenhaScreen';
-
-// Mock rápido do Dashboard para o App não quebrar ao finalizar o cadastro ou login
-import { Text } from 'react-native';
-function DashboardScreen({ navigation }: any) {
-  const handleLogout = async () => {
-    try {
-      // 1. Apaga os dados de sessão salvos localmente no celular
-      await SecureStore.deleteItemAsync('userToken');
-      await SecureStore.deleteItemAsync('manterConectado');
-      
-      // 2. Redireciona o usuário para a tela Welcome e apaga o histórico de navegação
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Welcome' }],
-      });
-    } catch (error) {
-      Alert.alert('Erro', 'Não foi possível fazer logout.');
-    }
-  };
-
-  return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F9FAFB' }}>
-      <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#111827', marginBottom: 32 }}>Painel Principal</Text>
-      
-      {/* Botão de Logout Temporário */}
-      <TouchableOpacity 
-        onPress={handleLogout}
-        style={{ 
-          backgroundColor: '#EF4444', // Cor vermelha para indicar saída/alerta
-          paddingVertical: 12, 
-          paddingHorizontal: 24, 
-          borderRadius: 8 
-        }}
-      >
-        <Text style={{ color: '#FFF', fontSize: 16, fontWeight: 'bold' }}>
-          Sair da Conta (Logout)
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
+import DashboardScreen from './src/screens/DashboardScreen';
+import NovaContaScreen from './src/screens/NovaContaScreen';
+import EvolucaoDetalhadaScreen from './src/screens/EvolucaoDetalhadaScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -113,6 +77,11 @@ export default function App() {
 
           {/* Área Logada (Onde as Tabs entrarão futuramente) */}
           <Stack.Screen name="Dashboard" component={DashboardScreen} />
+          <Stack.Screen name="NovaConta" component={NovaContaScreen} />
+          <Stack.Screen name="NovaTransacao" component={NovaTransacaoScreen} />
+          <Stack.Screen name="GerenciarCategorias" component={GerenciarCategoriasScreen} />
+          <Stack.Screen name="EvolucaoDetalhada" component={EvolucaoDetalhadaScreen} />    
+           
         </Stack.Navigator>
       </NavigationContainer>
     </CadastroProvider>

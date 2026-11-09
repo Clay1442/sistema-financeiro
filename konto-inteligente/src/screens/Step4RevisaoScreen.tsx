@@ -1,91 +1,140 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, Alert, StyleSheet } from 'react-native';
-import { useCadastro } from '../contexts/CadastroContext';
-import { supabase } from '../services/supabase';
+import { View, Text, TouchableOpacity, StyleSheet, Image, ActivityIndicator, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
+import { supabase } from '../services/supabase';
+import { useCadastro } from '../contexts/CadastroContext';
 
 export default function Step4RevisaoScreen({ navigation }: any) {
   const { dados, limparDados } = useCadastro();
   const [loading, setLoading] = useState(false);
 
+  const getNomePerfil = (tipo: string) => {
+    if (tipo === 'PF') return 'Pessoa Física';
+    if (tipo === 'PJ') return 'Pessoa Jurídica';
+    return 'Física e Jurídica';
+  };
+
   const handleFinalizar = async () => {
     setLoading(true);
     try {
-      // 1. Criptografar Senha localmente
       const hashSenha = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, dados.senha);
 
-      // 2. Criar Usuário (SEM O PIN)
-      const { data: usuario, error: errUser } = await supabase.from('usuarios')
-        .insert([{ 
-          nome: dados.nome, 
-          email: dados.email, 
-          senha: hashSenha, 
-          tipo_conta: dados.tipoConta 
-        }]).select().single();
-      
-      if (errUser) throw new Error(errUser.message);
+      // 1. Criar o Usuário Principal
+      const { data: novoUsuario, error: erroUsuario } = await supabase
+        .from('usuarios')
+        .insert([{
+          nome: dados.nome,
+          email: dados.email.toLowerCase(),
+          senha: hashSenha,
+          tipo_conta: dados.tipoConta
+        }])
+        .select()
+        .single();
 
-      // 3. Criar Perfis Financeiros
-      const perfisParaCriar = [];
+      if (erroUsuario) throw erroUsuario;
+
+      // 2. Criar os Perfis Financeiros com base na escolha
+      const perfis = [];
       if (dados.tipoConta === 'PF' || dados.tipoConta === 'PF_PJ') {
-        perfisParaCriar.push({ usuario_id: usuario.id, tipo: 'PESSOAL', nome: 'Minhas Finanças' });
+        perfis.push({ usuario_id: novoUsuario.id, tipo: 'PESSOAL', nome: 'Minhas Finanças' });
       }
       if (dados.tipoConta === 'PJ' || dados.tipoConta === 'PF_PJ') {
-        perfisParaCriar.push({ usuario_id: usuario.id, tipo: 'EMPRESARIAL', nome: 'Meu Negócio' });
+        perfis.push({ usuario_id: novoUsuario.id, tipo: 'EMPRESARIAL', nome: 'Meu Negócio' });
       }
 
-      const { error: errPerfis } = await supabase.from('perfis_financeiros').insert(perfisParaCriar);
-      if (errPerfis) throw new Error(errPerfis.message);
+      const { error: erroPerfil } = await supabase.from('perfis_financeiros').insert(perfis);
+      if (erroPerfil) throw erroPerfil;
 
-      // 4. Salvar sessão local criptografada (Auto-login)
-      await SecureStore.setItemAsync('userToken', usuario.id.toString());
-      await SecureStore.setItemAsync('manterConectado', 'true');
-
+      // 3. Logar o utilizador e ir para o Dashboard
+      await SecureStore.setItemAsync('userToken', novoUsuario.id.toString());
       limparDados();
-      navigation.reset({ index: 0, routes: [{ name: 'Dashboard' }] });
+      Alert.alert('Sucesso!', 'A sua conta Konto foi criada.', [
+        { text: 'Ir para o Painel', onPress: () => navigation.reset({ index: 0, routes: [{ name: 'Dashboard' }] }) }
+      ]);
 
-    } catch (error: any) {
-      Alert.alert('Erro no Cadastro', error.message);
+    } catch (err: any) {
+      Alert.alert('Erro ao criar conta', err.message || 'Ocorreu um erro inesperado.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Revisão do Cadastro</Text>
-      
-      <View style={styles.cardResumo}>
-        <Text style={styles.label}>Nome:</Text>
-        <Text style={styles.value}>{dados.nome}</Text>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.content}>
         
-        <Text style={styles.label}>E-mail:</Text>
-        <Text style={styles.value}>{dados.email}</Text>
-        
-        <Text style={styles.label}>Perfil Escolhido:</Text>
-        <Text style={styles.value}>
-          {dados.tipoConta === 'PF' ? 'Pessoal' : dados.tipoConta === 'PJ' ? 'Empresarial' : 'Compartilhado'}
-        </Text>
-        
-        <Text style={styles.label}>Segurança:</Text>
-        <Text style={styles.value}>Biometria ativada 🔒</Text>
-      </View>
+        {/* LOGO */}
+        <View style={styles.header}>
+          <View style={styles.logoContainer}>
+            <Image source={require('../../assets/logo.png')} style={styles.logoImage} resizeMode="contain" />
+            <Text style={styles.logoText}>Konto</Text>
+          </View>
+        </View>
 
-      <TouchableOpacity style={styles.btnPrincipal} onPress={handleFinalizar} disabled={loading}>
-        {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.btnText}>Finalizar Cadastro</Text>}
-      </TouchableOpacity>
-    </View>
+        <Text style={styles.title}>Revisar Informações</Text>
+
+        <View style={styles.cardRevisao}>
+          <View style={styles.linhaInfo}>
+            <Text style={styles.label}>Nome:</Text>
+            <Text style={styles.valor} numberOfLines={1}>{dados.nome}</Text>
+          </View>
+          <View style={styles.linhaInfo}>
+            <Text style={styles.label}>E-mail:</Text>
+            <Text style={styles.valor} numberOfLines={1}>{dados.email}</Text>
+          </View>
+          <View style={[styles.linhaInfo, { borderBottomWidth: 0 }]}>
+            <Text style={styles.label}>Perfil:</Text>
+            <Text style={styles.valor}>{getNomePerfil(dados.tipoConta)}</Text>
+          </View>
+        </View>
+
+        {/* BOTÃO CRIAR CONTA */}
+        <TouchableOpacity onPress={handleFinalizar} disabled={loading}>
+          <LinearGradient 
+            colors={['#0F172A', '#1D4ED8', '#3B82F6']} 
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={styles.btnGradient}
+          >
+            {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.btnText}>Criar Minha Conta</Text>}
+          </LinearGradient>
+        </TouchableOpacity>
+
+        {/* LINK VOLTAR */}
+        <View style={styles.footer}>
+          <TouchableOpacity onPress={() => navigation.goBack()} disabled={loading}>
+            <Text style={styles.linkTextDark}>
+              <Text style={{ color: '#9CA3AF' }}>❮</Text> Voltar e Editar
+            </Text>
+          </TouchableOpacity>
+        </View>
+        
+      </View>
+    </SafeAreaView>
   );
 }
 
-// Estilos
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24, backgroundColor: '#F9FAFB', justifyContent: 'center' },
-  title: { fontSize: 28, fontWeight: 'bold', marginBottom: 24, color: '#111827' },
-  cardResumo: { backgroundColor: '#FFF', padding: 20, borderRadius: 12, marginBottom: 32, borderWidth: 1, borderColor: '#E5E7EB' },
-  label: { fontSize: 14, color: '#6B7280', marginTop: 12 },
-  value: { fontSize: 18, fontWeight: '600', color: '#111827', marginBottom: 4 },
-  btnPrincipal: { backgroundColor: '#10B981', padding: 16, borderRadius: 8, alignItems: 'center' },
-  btnText: { color: '#FFF', fontSize: 18, fontWeight: 'bold' }
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  content: { flex: 1, paddingHorizontal: 32, justifyContent: 'center' },
+  
+  header: { alignItems: 'center', marginBottom: 40 },
+  logoContainer: { flexDirection: 'row', alignItems: 'center' },
+  logoImage: { width: 44, height: 44, marginRight: 8 },
+  logoText: { fontSize: 40, fontWeight: '900', color: '#0F172A', letterSpacing: -1 },
+  
+  title: { fontSize: 20, color: '#1D4ED8', fontWeight: '800', textAlign: 'center', marginBottom: 24 },
+  
+  cardRevisao: { backgroundColor: '#F8FAFC', padding: 24, borderRadius: 24, borderWidth: 2, borderColor: '#0F172A', marginBottom: 32 },
+  linhaInfo: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
+  label: { fontSize: 14, color: '#64748B', fontWeight: '700' },
+  valor: { fontSize: 14, color: '#0F172A', fontWeight: '800', flex: 1, textAlign: 'right', marginLeft: 16 },
+  
+  btnGradient: { height: 56, borderRadius: 30, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+  btnText: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold' },
+  
+  footer: { alignItems: 'center', marginTop: 12 },
+  linkTextDark: { color: '#0F172A', fontSize: 14, fontWeight: '700' }
 });
