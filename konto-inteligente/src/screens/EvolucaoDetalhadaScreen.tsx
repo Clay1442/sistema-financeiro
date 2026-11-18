@@ -78,7 +78,7 @@ export default function EvolucaoDetalhadaScreen({ route, navigation }: any) {
     // Pega as datas formatadas (ex: 15/10) e os valores
     const labels = dadosCronologicos.map(t => {
       const [ano, mes, dia] = t.data_pagamento.split('-');
-      return `${dia}/${mes}`;
+      return `${dia}/${mes}/${ano}`;
     });
     const data = dadosCronologicos.map(t => Number(t.valor));
 

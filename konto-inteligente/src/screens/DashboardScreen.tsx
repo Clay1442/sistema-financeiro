@@ -97,9 +97,9 @@ export default function DashboardScreen({ navigation }: any) {
       if (idsContas.length > 0) {
         const { data: dataTransacoes, error: errTrans } = await supabase
           .from('transacoes')
-          .select('id, valor, tipo, data_pagamento')
+          .select('id, valor, tipo, data_pagamento, descricao')
           .in('conta_id', idsContas);
-          
+
         if (errTrans) throw errTrans;
         setTransacoes(dataTransacoes || []);
       } else {
@@ -121,18 +121,38 @@ export default function DashboardScreen({ navigation }: any) {
   const saldoTotal = contas.reduce((acc, conta) => acc + Number(conta.saldo_atual), 0);
   const formatarMoeda = (valor: number) => valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-// --- LÓGICA DOS GRÁFICOS ---
-  // Invertemos a ordem para que o gráfico seja desenhado do mais antigo (esquerda) para o mais recente (direita)
-  const transacoesReceitas = transacoes.filter(t => t.tipo === 'RECEITA').reverse();
-  const transacoesDespesas = transacoes.filter(t => t.tipo === 'DESPESA').reverse();
+  // --- LÓGICA DOS GRÁFICOS E PRÓ-LABORE (MÊS ATUAL) ---
+  const dataAtual = new Date();
+  const mesAtual = dataAtual.getMonth() + 1;
+  const anoAtual = dataAtual.getFullYear();
 
-  // Soma dos valores exibidos nos cartões
+  // 1. Filtra para deixar apenas transações deste mês e ano
+  const transacoesDoMes = transacoes.filter(t => {
+    if (!t.data_pagamento) return false;
+    const [ano, mes] = t.data_pagamento.split('-');
+    return Number(ano) === anoAtual && Number(mes) === mesAtual;
+  });
+
+  // 2. Separa as transações filtradas por tipo e ordena
+  const transacoesReceitas = transacoesDoMes
+    .filter(t => t.tipo === 'RECEITA')
+    .sort((a, b) => new Date(a.data_pagamento).getTime() - new Date(b.data_pagamento).getTime());
+    
+  const transacoesDespesas = transacoesDoMes
+    .filter(t => t.tipo === 'DESPESA')
+    .sort((a, b) => new Date(a.data_pagamento).getTime() - new Date(b.data_pagamento).getTime());
+
+  // 3. Soma os valores APENAS do mês atual para o cálculo do Pró-labore e gráficos
   const totalReceitas = transacoesReceitas.reduce((acc, t) => acc + Number(t.valor), 0);
   const totalDespesas = transacoesDespesas.reduce((acc, t) => acc + Number(t.valor), 0);
+  
+  // Lucro do Mês
+  const lucroMensal = totalReceitas - totalDespesas;
+  
+  // Verifica se já existe uma despesa de Pró-labore NESTE MÊS
+  const retiradaRealizada = transacoesDespesas.some(t => t.descricao?.includes('Pró-labore'));
 
-  // O react-native-chart-kit precisa de pelo menos 2 pontos para desenhar uma linha.
-  // Esta função garante que a linha é desenhada mesmo que haja 0 ou apenas 1 transação.
-  const formatarDadosGrafico = (lista: typeof transacoes) => {
+  const formatarDadosGrafico = (lista: any[]) => {
     if (lista.length === 0) return [0, 0, 0, 0];
     if (lista.length === 1) return [0, Number(lista[0].valor)];
     return lista.map(t => Number(t.valor));
@@ -140,7 +160,6 @@ export default function DashboardScreen({ navigation }: any) {
 
   const dadosGraficoReceitas = formatarDadosGrafico(transacoesReceitas);
   const dadosGraficoDespesas = formatarDadosGrafico(transacoesDespesas);
-  // ---------------------------
 
   if (loadingApp) {
     return (
@@ -212,12 +231,12 @@ export default function DashboardScreen({ navigation }: any) {
           <Text style={styles.saldoComparacao}>Em relação ao mês passado</Text>
         </LinearGradient>
 
-       {/* RESUMO EM GRÁFICOS DINÂMICOS */}
+        {/* RESUMO EM GRÁFICOS DINÂMICOS */}
         <View style={styles.graficosContainer}>
-          
+
           {/* Card Receitas Clicável */}
-          <TouchableOpacity 
-            style={styles.cardGrafico} 
+          <TouchableOpacity
+            style={styles.cardGrafico}
             activeOpacity={0.7}
             onPress={() => navigation.navigate('EvolucaoDetalhada', { perfilId: perfilAtivo?.id, tipo: 'RECEITA' })}
           >
@@ -231,11 +250,11 @@ export default function DashboardScreen({ navigation }: any) {
                 <Text style={styles.graficoValor}>{formatarMoeda(totalReceitas)}</Text>
               </View>
             </View>
-            
+
             <View style={styles.chartWrapper}>
               <LineChart
                 data={{ labels: [], datasets: [{ data: dadosGraficoReceitas }] }} // DADOS REAIS AQUI
-                width={cardWidth + 10} 
+                width={cardWidth + 10}
                 height={60}
                 withDots={false}
                 withInnerLines={false}
@@ -259,8 +278,8 @@ export default function DashboardScreen({ navigation }: any) {
           </TouchableOpacity>
 
           {/* Card Despesas Clicável */}
-          <TouchableOpacity 
-            style={styles.cardGrafico} 
+          <TouchableOpacity
+            style={styles.cardGrafico}
             activeOpacity={0.7}
             onPress={() => navigation.navigate('EvolucaoDetalhada', { perfilId: perfilAtivo?.id, tipo: 'DESPESA' })}
           >
@@ -274,7 +293,7 @@ export default function DashboardScreen({ navigation }: any) {
                 <Text style={styles.graficoValor}>{formatarMoeda(totalDespesas)}</Text>
               </View>
             </View>
-            
+
             <View style={styles.chartWrapper}>
               <LineChart
                 data={{ labels: [], datasets: [{ data: dadosGraficoDespesas }] }} // DADOS REAIS AQUI
@@ -321,7 +340,10 @@ export default function DashboardScreen({ navigation }: any) {
             <Text style={styles.actionText}>Receber</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionBtn} onPress={() => Alert.alert('Extrato', 'Tela de extrato em desenvolvimento.')}>
+          <TouchableOpacity
+            style={styles.actionBtn}
+            onPress={() => navigation.navigate('Extrato', { perfilId: perfilAtivo?.id })}
+          >
             <View style={styles.actionIconBg}><Feather name="file-text" size={24} color="#0F172A" /></View>
             <Text style={styles.actionText}>Extrato</Text>
           </TouchableOpacity>
@@ -331,6 +353,79 @@ export default function DashboardScreen({ navigation }: any) {
             <Text style={styles.actionText}>Mais</Text>
           </TouchableOpacity>
         </View>
+
+        {/* CARD INTELIGENTE DE PRÓ-LABORE */}
+        {perfilAtivo?.tipo === 'EMPRESARIAL' && perfis.find(p => p.tipo === 'PESSOAL') && (
+          <>
+            {retiradaRealizada ? (
+              /* ESTADO 1: JÁ RETIROU NESTE MÊS (MAS PODE RETIRAR MAIS SE HOUVER LUCRO) */
+              <TouchableOpacity 
+                style={[styles.cardProLabore, { backgroundColor: '#D1FAE5', borderColor: '#10B981' }]}
+                activeOpacity={lucroMensal > 0 ? 0.7 : 1}
+                onPress={() => {
+                  if (lucroMensal > 0) {
+                    navigation.navigate('Retirada', { 
+                      perfilPjId: perfilAtivo.id, 
+                      perfilPfId: perfis.find(p => p.tipo === 'PESSOAL')?.id,
+                      lucroAtual: lucroMensal // Passa apenas o lucro que sobrou
+                    });
+                  } else {
+                    Alert.alert('Lucro Zerado', 'A sua empresa não possui mais lucro disponível para retirar este mês.');
+                  }
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                  <View style={[styles.iconeProLabore, { backgroundColor: '#A7F3D0' }]}>
+                    <AntDesign name="check-circle" size={20} color="#059669" />
+                  </View>
+                  <View style={{ flex: 1, paddingRight: 8 }}>
+                    <Text style={[styles.tituloProLabore, { color: '#065F46' }]}>Retirada Concluída</Text>
+                    <Text style={[styles.subtituloProLabore, { color: '#047857' }]}>
+                      {lucroMensal > 0 
+                        ? `Ainda restam ${formatarMoeda(lucroMensal)} de lucro. Toque para retirar mais.` 
+                        : 'O pró-labore deste mês já foi transferido.'}
+                    </Text>
+                  </View>
+                </View>
+                {lucroMensal > 0 && <AntDesign name="right" size={20} color="#059669" />}
+              </TouchableOpacity>
+            ) : lucroMensal > 0 ? (
+              /* ESTADO 2: PRIMEIRA RETIRADA DO MÊS */
+              <TouchableOpacity 
+                style={styles.cardProLabore}
+                onPress={() => navigation.navigate('Retirada', { 
+                  perfilPjId: perfilAtivo.id, 
+                  perfilPfId: perfis.find(p => p.tipo === 'PESSOAL')?.id,
+                  lucroAtual: lucroMensal
+                })}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <View style={styles.iconeProLabore}>
+                    <AntDesign name="star" size={20} color="#D97706" />
+                  </View>
+                  <View>
+                    <Text style={styles.tituloProLabore}>Fazer Minha Retirada</Text>
+                    <Text style={styles.subtituloProLabore}>Lucro do mês: {formatarMoeda(lucroMensal)}</Text>
+                  </View>
+                </View>
+                <AntDesign name="right" size={20} color="#D97706" />
+              </TouchableOpacity>
+            ) : null}
+          </>
+        )}
+
+        {/* MENSAGEM NO PERFIL PESSOAL */}
+        {perfilAtivo?.tipo === 'PESSOAL' && perfis.find(p => p.tipo === 'EMPRESARIAL') && (
+          <View style={[styles.cardProLabore, { borderColor: '#E2E8F0', backgroundColor: '#F8FAFC' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <MaterialCommunityIcons name="office-building" size={24} color="#64748B" style={{ marginRight: 12 }} />
+              <View>
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#0F172A' }}>Rendimento Empresarial</Text>
+                <Text style={{ fontSize: 12, color: '#64748B' }}>Acesse seu Perfil PJ para realizar retiradas.</Text>
+              </View>
+            </View>
+          </View>
+        )}
 
         {loadingPainel ? (
           <ActivityIndicator color="#1D4ED8" style={{ marginTop: 40 }} />
@@ -448,50 +543,55 @@ const styles = StyleSheet.create({
 
 
   /* GRÁFICOS */
-  graficosContainer: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    marginBottom: 32 
+  graficosContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 32
   },
-  cardGrafico: { 
-    flex: 1, 
-    backgroundColor: '#FFFFFF', 
-    borderRadius: 16, 
-    borderWidth: 1, 
-    borderColor: '#E2E8F0', 
-    overflow: 'hidden', 
+  cardGrafico: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
     marginHorizontal: 4 // Espaço entre os cards
   },
-  cardGraficoHeader: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    padding: 12, 
-    paddingBottom: 0 
+  cardGraficoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    paddingBottom: 0
   },
-  graficoIconBg: { 
-    width: 32, 
-    height: 32, 
-    borderRadius: 16, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    marginRight: 8 
+  graficoIconBg: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8
   },
-  graficoTitulo: { 
-    fontSize: 12, 
+  graficoTitulo: {
+    fontSize: 12,
     color: '#1E3A8A', // Azul escuro do seu layout
-    fontWeight: '700' 
+    fontWeight: '700'
   },
-  graficoValor: { 
-    fontSize: 14, 
-    color: '#0F172A', 
-    fontWeight: '900' 
+  graficoValor: {
+    fontSize: 14,
+    color: '#0F172A',
+    fontWeight: '900'
   },
-  chartWrapper: { 
-    marginTop: 8, 
+  chartWrapper: {
+    marginTop: 8,
     marginLeft: -15, // Puxa o gráfico para a esquerda para esconder as margens padrão da biblioteca
-    marginBottom: -10 
+    marginBottom: -10
   },
-  chartStyle: { 
-    paddingRight: 0 
+  chartStyle: {
+    paddingRight: 0
   },
+
+  cardProLabore: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#FEF3C7', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#FDE68A', marginBottom: 32 },
+  iconeProLabore: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FDE68A', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  tituloProLabore: { fontSize: 16, fontWeight: 'bold', color: '#92400E' },
+  subtituloProLabore: { fontSize: 12, color: '#B45309', marginTop: 2 },
 });

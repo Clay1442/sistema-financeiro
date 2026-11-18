@@ -18,6 +18,8 @@ import EsqueciSenhaScreen from './src/screens/EsqueciSenhaScreen';
 import DashboardScreen from './src/screens/DashboardScreen';
 import NovaContaScreen from './src/screens/NovaContaScreen';
 import EvolucaoDetalhadaScreen from './src/screens/EvolucaoDetalhadaScreen';
+import RetiradaScreen from './src/screens/RetiradaScreen';
+import ExtratoScreen from './src/screens/ExtratoScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -81,7 +83,9 @@ export default function App() {
           <Stack.Screen name="NovaTransacao" component={NovaTransacaoScreen} />
           <Stack.Screen name="GerenciarCategorias" component={GerenciarCategoriasScreen} />
           <Stack.Screen name="EvolucaoDetalhada" component={EvolucaoDetalhadaScreen} />    
-           
+          <Stack.Screen name="Extrato" component={ExtratoScreen} /> 
+          <Stack.Screen name="Retirada" component={RetiradaScreen} />
+
         </Stack.Navigator>
       </NavigationContainer>
     </CadastroProvider>
