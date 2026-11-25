@@ -4,7 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import * as Crypto from 'expo-crypto';
 import { supabase } from '../services/supabase';
-import { Feather, MaterialCommunityIcons, AntDesign } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as LocalAuthentication from 'expo-local-authentication';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export default function LoginScreen({ navigation }: any) {
@@ -31,7 +32,11 @@ export default function LoginScreen({ navigation }: any) {
 
       if (error || !usuario) throw new Error('E-mail ou senha incorretos.');
 
+      // Salva o token da sessão ativa
       await SecureStore.setItemAsync('userToken', usuario.id.toString());
+      // NOVO: Salva um token permanente para a biometria lembrar quem é o dono do telemóvel
+      await SecureStore.setItemAsync('savedUserId', usuario.id.toString());
+
       navigation.reset({ index: 0, routes: [{ name: 'Dashboard' }] });
 
     } catch (err: any) {
@@ -41,8 +46,46 @@ export default function LoginScreen({ navigation }: any) {
     }
   };
 
-  const handleBiometria = () => {
-    Alert.alert('Em breve', 'A autenticação por biometria será implementada em breve!');
+  const handleBiometria = async () => {
+    try {
+      const biometriaAtiva = await SecureStore.getItemAsync('Konto_Biometria');
+      if (biometriaAtiva !== 'true') {
+        return Alert.alert(
+          'Biometria Desativada',
+          'Você precisa fazer login com e-mail e senha primeiro e ativar a biometria na tela "Meu Perfil".'
+        );
+      }
+
+      // NOVO: Agora procura o ID salvo permanentemente em vez do token da sessão
+      const userIdSalvo = await SecureStore.getItemAsync('savedUserId');
+      if (!userIdSalvo) {
+        return Alert.alert(
+          'Conta não vinculada',
+          'Faça o login tradicional com e-mail e senha uma vez para vincular sua conta a este dispositivo.'
+        );
+      }
+
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      if (!hasHardware) return Alert.alert('Atenção', 'Seu dispositivo não suporta biometria.');
+
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+      if (!isEnrolled) return Alert.alert('Atenção', 'Nenhuma biometria cadastrada no celular.');
+
+      const auth = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Entre no Konto',
+        fallbackLabel: 'Usar senha',
+        cancelLabel: 'Cancelar',
+      });
+
+      if (auth.success) {
+        // NOVO: A biometria validou o utilizador! Recriamos a sessão ativa e entramos no app
+        await SecureStore.setItemAsync('userToken', userIdSalvo);
+        navigation.reset({ index: 0, routes: [{ name: 'Dashboard' }] });
+      }
+
+    } catch (err) {
+      Alert.alert('Erro', 'Ocorreu um problema ao acessar a biometria.');
+    }
   };
 
   return (
@@ -50,88 +93,88 @@ export default function LoginScreen({ navigation }: any) {
       <View style={styles.content}>
 
         {/* LOGO E SUBTÍTULO */}
-        <View style={styles.header}>            
+        <View style={styles.header}>
           <View style={styles.logoContainer}>
-              <Image
-                source={require('../../assets/logo.png')}
-                style={styles.logoImage}
-                resizeMode="contain"
-              />
-              <Text style={styles.logoText}>Konto</Text>
-            </View>
-            <Text style={styles.subtitle}>Organize hoje, conquiste amanhã</Text>
+            <Image
+              source={require('../../assets/logo.png')}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
+            <Text style={styles.logoText}>Konto</Text>
           </View>
-
-          {/* CAMPOS DE ENTRADA */}
-          <View style={styles.form}>
-            <View style={styles.inputContainer}>
-              <Feather name="mail" size={20} color="#111827" style={styles.iconLeft} />
-              <TextInput
-                style={styles.input}
-                placeholder="E-mail"
-                placeholderTextColor="#9CA3AF"
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                keyboardType="email-address"
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Feather name="shield" size={20} color="#111827" style={styles.iconLeft} />
-              <TextInput
-                style={styles.input}
-                placeholder="Senha"
-                placeholderTextColor="#9CA3AF"
-                value={senha}
-                onChangeText={setSenha}
-                secureTextEntry={!showSenha}
-              />
-              <TouchableOpacity onPress={() => setShowSenha(!showSenha)} style={styles.iconRight}>
-                <Feather name={showSenha ? "eye" : "eye-off"} size={20} color="#111827" />
-              </TouchableOpacity>
-            </View>
-
-            <TouchableOpacity
-              style={styles.linkEsqueci}
-              onPress={() => navigation.navigate('EsqueciSenha')}
-            >
-              <Text style={styles.linkTextDark}>Esqueci minha senha ➔</Text>
-            </TouchableOpacity>
-
-            {/* BOTÃO ENTRAR COM GRADIENTE */}
-            <TouchableOpacity onPress={handleLoginTradicional} disabled={loading}>
-              <LinearGradient
-                colors={['#0F172A', '#1D4ED8', '#3B82F6']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.btnGradient}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#FFF" />
-                ) : (
-                  <Text style={styles.btnText}>Entrar</Text>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.linkCriar}
-              onPress={() => navigation.navigate('Step1Basico')}
-            >
-              <Text style={styles.linkTextBlue}>Criar minha conta ➔</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* BIOMETRIA */}
-          <View style={styles.footer}>
-            <TouchableOpacity style={styles.biometriaBtn} onPress={handleBiometria}>
-              <MaterialCommunityIcons name="fingerprint" size={48} color="#2563EB" />
-              <Text style={styles.biometriaText}>Entrar com biometria</Text>
-            </TouchableOpacity>
-          </View>
-
+          <Text style={styles.subtitle}>Organize hoje, conquiste amanhã</Text>
         </View>
+
+        {/* CAMPOS DE ENTRADA */}
+        <View style={styles.form}>
+          <View style={styles.inputContainer}>
+            <Feather name="mail" size={20} color="#111827" style={styles.iconLeft} />
+            <TextInput
+              style={styles.input}
+              placeholder="E-mail"
+              placeholderTextColor="#9CA3AF"
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+            />
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Feather name="shield" size={20} color="#111827" style={styles.iconLeft} />
+            <TextInput
+              style={styles.input}
+              placeholder="Senha"
+              placeholderTextColor="#9CA3AF"
+              value={senha}
+              onChangeText={setSenha}
+              secureTextEntry={!showSenha}
+            />
+            <TouchableOpacity onPress={() => setShowSenha(!showSenha)} style={styles.iconRight}>
+              <Feather name={showSenha ? "eye" : "eye-off"} size={20} color="#111827" />
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            style={styles.linkEsqueci}
+            onPress={() => navigation.navigate('EsqueciSenha')}
+          >
+            <Text style={styles.linkTextDark}>Esqueci minha senha ➔</Text>
+          </TouchableOpacity>
+
+          {/* BOTÃO ENTRAR COM GRADIENTE */}
+          <TouchableOpacity onPress={handleLoginTradicional} disabled={loading}>
+            <LinearGradient
+              colors={['#0F172A', '#1D4ED8', '#3B82F6']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.btnGradient}
+            >
+              {loading ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <Text style={styles.btnText}>Entrar</Text>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.linkCriar}
+            onPress={() => navigation.navigate('Step1Basico')}
+          >
+            <Text style={styles.linkTextBlue}>Criar minha conta ➔</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* BIOMETRIA */}
+        <View style={styles.footer}>
+          <TouchableOpacity style={styles.biometriaBtn} onPress={handleBiometria}>
+            <MaterialCommunityIcons name="fingerprint" size={48} color="#2563EB" />
+            <Text style={styles.biometriaText}>Entrar com biometria</Text>
+          </TouchableOpacity>
+        </View>
+
+      </View>
     </SafeAreaView>
   );
 }

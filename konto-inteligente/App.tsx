@@ -20,6 +20,9 @@ import NovaContaScreen from './src/screens/NovaContaScreen';
 import EvolucaoDetalhadaScreen from './src/screens/EvolucaoDetalhadaScreen';
 import RetiradaScreen from './src/screens/RetiradaScreen';
 import ExtratoScreen from './src/screens/ExtratoScreen';
+import PerfilScreen from './src/screens/PerfilScreen';
+import EditarDadosScreen from './src/screens/EditarDadosScreen';
+import DetalhesContaScreen from './src/screens/DetalhesContaScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -85,6 +88,9 @@ export default function App() {
           <Stack.Screen name="EvolucaoDetalhada" component={EvolucaoDetalhadaScreen} />    
           <Stack.Screen name="Extrato" component={ExtratoScreen} /> 
           <Stack.Screen name="Retirada" component={RetiradaScreen} />
+          <Stack.Screen name="Perfil" component={PerfilScreen} />
+          <Stack.Screen name="EditarDados" component={EditarDadosScreen} />
+          <Stack.Screen name="DetalhesConta" component={DetalhesContaScreen} />
 
         </Stack.Navigator>
       </NavigationContainer>

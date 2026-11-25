@@ -1,231 +1,379 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Switch, Modal, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../services/supabase';
-
-type TipoTransacao = 'RECEITA' | 'DESPESA';
+import { AntDesign } from '@expo/vector-icons';
 
 export default function NovaTransacaoScreen({ route, navigation }: any) {
-  // 1. Extraia o tipoTransacao do route.params (além do perfilId)
-  const { perfilId, tipoTransacao } = route.params;
-  const [descricao, setDescricao] = useState('');
+  const tipoInicial = route.params?.tipoTransacao || 'DESPESA';
+  const perfilId = route.params?.perfilId;
+  
+  const [tipo, setTipo] = useState(tipoInicial);
   const [valor, setValor] = useState('');
+  const [descricao, setDescricao] = useState('');
+  const [dataVencimento, setDataVencimento] = useState('');
+  const [jaFoiPago, setJaFoiPago] = useState(true);
 
-  // 2. Defina o estado inicial do tipo usando o valor que veio da navegação.
-  // Se não vier nada (por segurança), assume 'DESPESA' como padrão.
-  const [tipo, setTipo] = useState<'RECEITA' | 'DESPESA'>(tipoTransacao || 'DESPESA');
-  
   const [contas, setContas] = useState<any[]>([]);
-  const [contaSelecionada, setContaSelecionada] = useState<any>(null);
-  
   const [categorias, setCategorias] = useState<any[]>([]);
-  const [categoriaSelecionada, setCategoriaSelecionada] = useState<any>(null);
   
-  const [loadingDados, setLoadingDados] = useState(true);
-  const [loadingSalvar, setLoadingSalvar] = useState(false);
+  const [contaSelecionada, setContaSelecionada] = useState<any>(null);
+  const [categoriaSelecionada, setCategoriaSelecionada] = useState<any>(null);
 
-  // Substitua o useEffect atual por este:
+  const [loading, setLoading] = useState(true);
+  const [salvando, setSalvando] = useState(false);
+
+  // Controladores dos Modais (Dropdowns e Criação)
+  const [modalContaVisivel, setModalContaVisivel] = useState(false);
+  const [modalCatVisivel, setModalCatVisivel] = useState(false);
+  const [modalNovaCatVisivel, setModalNovaCatVisivel] = useState(false);
+  
+  // Estado para a nova categoria
+  const [novaCategoriaNome, setNovaCategoriaNome] = useState('');
+  const [salvandoCategoria, setSalvandoCategoria] = useState(false);
+
   useEffect(() => {
-    const carregarDados = async () => {
-      try {
-        const { data: contasData } = await supabase.from('contas_bancarias').select('id, nome, saldo_atual').eq('perfil_id', perfilId);
-        setContas(contasData || []);
-        if (contasData && contasData.length > 0 && !contaSelecionada) setContaSelecionada(contasData[0]);
-
-        const { data: categoriasData } = await supabase.from('categorias').select('id, nome, tipo').eq('perfil_id', perfilId).eq('tipo', tipo);
-        setCategorias(categoriasData || []);
-      } catch (error: any) {
-        console.error(error);
-      } finally {
-        setLoadingDados(false);
-      }
-    };
-    
-    // Carrega quando o tipo muda ou quando a tela ganha foco
-    const unsubscribe = navigation.addListener('focus', carregarDados);
     carregarDados();
-    
-    return unsubscribe;
-  }, [perfilId, tipo]); // Recarrega as categorias se o usuário mudar de Receita para Despesa
+    const hoje = new Date();
+    const dia = String(hoje.getDate()).padStart(2, '0');
+    const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+    const ano = hoje.getFullYear();
+    setDataVencimento(`${dia}/${mes}/${ano}`);
+  }, []);
 
-  const handleSalvar = async () => {
-    if (!descricao.trim() || !valor.trim() || !contaSelecionada || !categoriaSelecionada) {
-      return Alert.alert('Atenção', 'Preencha todos os campos e selecione uma conta e categoria.');
-    }
-
-    const valorNumerico = parseFloat(valor.replace(',', '.'));
-    if (isNaN(valorNumerico) || valorNumerico <= 0) {
-      return Alert.alert('Atenção', 'Digite um valor válido.');
-    }
-
-    setLoadingSalvar(true);
+  const carregarDados = async () => {
     try {
-      // Pega a data de hoje no formato YYYY-MM-DD para o banco de dados
-      const dataHoje = new Date().toISOString().split('T')[0];
+      if (!perfilId) throw new Error('Perfil não identificado.');
 
-      // 1. Insere a transação respeitando exatamente a sua tabela
-      const { error: erroTransacao } = await supabase
-        .from('transacoes')
-        .insert([{
-          conta_id: contaSelecionada.id,
-          categoria_id: categoriaSelecionada.id,
-          tipo: tipo,
-          descricao: descricao.trim(),
-          valor: valorNumerico,
-          data_vencimento: dataHoje, // Campo obrigatório na sua tabela
-          data_pagamento: dataHoje
-        }]);
-
-      if (erroTransacao) throw erroTransacao;
-
-      // 2. Calcula e atualiza o novo saldo da conta
-      const novoSaldo = tipo === 'RECEITA' 
-        ? Number(contaSelecionada.saldo_atual) + valorNumerico
-        : Number(contaSelecionada.saldo_atual) - valorNumerico;
-
-      const { error: erroConta } = await supabase
+      const { data: dataContas, error: errContas } = await supabase
         .from('contas_bancarias')
-        .update({ saldo_atual: novoSaldo })
-        .eq('id', contaSelecionada.id);
+        .select('id, nome, saldo_atual')
+        .eq('perfil_id', perfilId);
+      if (errContas) throw errContas;
+      setContas(dataContas || []);
+      if (dataContas && dataContas.length > 0) setContaSelecionada(dataContas[0]);
 
-      if (erroConta) throw erroConta;
-
-      Alert.alert('Sucesso', 'Transação registrada!');
-      navigation.goBack(); // Volta para o Dashboard
-
-    } catch (err: any) {
-      Alert.alert('Erro ao salvar', err.message);
+      const { data: dataCat, error: errCat } = await supabase
+        .from('categorias')
+        .select('id, nome, tipo')
+        .eq('perfil_id', perfilId);
+      if (errCat) throw errCat;
+      setCategorias(dataCat || []);
+      
+    } catch (error: any) {
+      Alert.alert('Erro', 'Não foi possível carregar os dados.');
     } finally {
-      setLoadingSalvar(false);
+      setLoading(false);
     }
   };
 
-  if (loadingDados) {
+  const handleDataChange = (text: string) => {
+    let formatado = text.replace(/\D/g, '');
+    if (formatado.length > 2) formatado = formatado.replace(/^(\d{2})(\d)/, '$1/$2');
+    if (formatado.length > 5) formatado = formatado.replace(/^(\d{2})\/(\d{2})(\d)/, '$1/$2/$3');
+    setDataVencimento(formatado.substring(0, 10));
+  };
+
+  // --- NOVA FUNÇÃO: CRIAR CATEGORIA DIRETAMENTE NA TELA ---
+  const handleCriarCategoria = async () => {
+    if (!novaCategoriaNome.trim()) return Alert.alert('Atenção', 'Digite um nome para a categoria.');
+    
+    setSalvandoCategoria(true);
+    try {
+      const { data, error } = await supabase.from('categorias').insert([{
+        nome: novaCategoriaNome.trim(),
+        tipo: tipo, // Vincula a categoria ao tipo que está selecionado (Receita ou Despesa)
+        perfil_id: perfilId
+      }]).select().single();
+
+      if (error) throw error;
+
+      // Atualiza a lista de categorias, seleciona a nova e fecha o modal
+      setCategorias([...categorias, data]);
+      setCategoriaSelecionada(data);
+      setModalNovaCatVisivel(false);
+      setNovaCategoriaNome('');
+      
+    } catch (error: any) {
+      Alert.alert('Erro', 'Não foi possível criar a categoria.');
+    } finally {
+      setSalvandoCategoria(false);
+    }
+  };
+
+  const handleSalvar = async () => {
+    const valorNum = parseFloat(valor.replace(',', '.'));
+    if (isNaN(valorNum) || valorNum <= 0) return Alert.alert('Atenção', 'Insira um valor válido.');
+    if (!contaSelecionada) return Alert.alert('Atenção', 'Selecione uma conta.');
+    if (!categoriaSelecionada) return Alert.alert('Atenção', 'Selecione uma categoria.');
+    if (dataVencimento.length !== 10) return Alert.alert('Atenção', 'Insira uma data válida (dd/mm/aaaa).');
+
+    const [dia, mes, ano] = dataVencimento.split('/');
+    const dataIso = `${ano}-${mes}-${dia}`;
+    const descricaoFinal = descricao.trim() === '' ? 'Sem descrição' : descricao.trim();
+    const statusTransacao = jaFoiPago ? 'PAGO' : 'PENDENTE';
+    const dataPagamento = jaFoiPago ? dataIso : null;
+
+    setSalvando(true);
+    try {
+      const { error: errTransacao } = await supabase.from('transacoes').insert([{
+        conta_id: contaSelecionada.id,
+        categoria_id: categoriaSelecionada.id,
+        tipo: tipo,
+        descricao: descricaoFinal,
+        valor: valorNum,
+        data_vencimento: dataIso,
+        data_pagamento: dataPagamento,
+        status: statusTransacao
+      }]);
+      if (errTransacao) throw errTransacao;
+
+      if (jaFoiPago) {
+        const saldoAtual = Number(contaSelecionada.saldo_atual);
+        const novoSaldo = tipo === 'RECEITA' ? saldoAtual + valorNum : saldoAtual - valorNum;
+        
+        const { error: errConta } = await supabase
+          .from('contas_bancarias')
+          .update({ saldo_atual: novoSaldo })
+          .eq('id', contaSelecionada.id);
+        if (errConta) throw errConta;
+      }
+
+      Alert.alert('Sucesso', 'Transação registada!', [
+        { text: 'OK', onPress: () => navigation.goBack() }
+      ]);
+
+    } catch (error: any) {
+      Alert.alert('Erro ao salvar', error.message);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  if (loading) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color="#10B981" />
+        <ActivityIndicator size="large" color="#4F46E5" />
       </View>
     );
   }
 
+  const categoriasFiltradas = categorias.filter(c => c.tipo === tipo || c.tipo === 'AMBOS');
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Nova Transação</Text>
-
-      {/* Alternador Receita / Despesa */}
-      <View style={styles.rowTipos}>
-        <TouchableOpacity 
-          style={[styles.btnTipo, tipo === 'RECEITA' && styles.btnReceita]}
-          onPress={() => setTipo('RECEITA')}
-        >
-          <Text style={[styles.txtTipo, tipo === 'RECEITA' && { color: '#FFF' }]}>Receita 📈</Text>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 8 }}>
+          <AntDesign name="arrow-left" size={24} color="#000" />
         </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.btnTipo, tipo === 'DESPESA' && styles.btnDespesa]}
-          onPress={() => setTipo('DESPESA')}
-        >
-          <Text style={[styles.txtTipo, tipo === 'DESPESA' && { color: '#FFF' }]}>Despesa 📉</Text>
+        <Text style={styles.headerTitle}>Nova Transação</Text>
+        <TouchableOpacity style={{ padding: 8 }}>
+          <AntDesign name="plus" size={24} color="#000" />
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.label}>Valor (R$)</Text>
-      <TextInput 
-        style={[styles.input, { fontSize: 24, fontWeight: 'bold', color: tipo === 'RECEITA' ? '#10B981' : '#EF4444' }]} 
-        placeholder="0.00" 
-        keyboardType="numeric"
-        value={valor} 
-        onChangeText={setValor} 
-      />
-
-      <Text style={styles.label}>Descrição</Text>
-      <TextInput 
-        style={styles.input} 
-        placeholder="Ex: Conta de Luz, Venda de Produto..." 
-        value={descricao} 
-        onChangeText={setDescricao} 
-      />
-
-      <Text style={styles.label}>Categoria</Text>
-      {categorias.length === 0 ? (
-        <Text style={styles.alertaVazio}>Nenhuma categoria de {tipo.toLowerCase()} encontrada.</Text>
-      ) : (
-        <View style={styles.rowChips}>
-          {categorias.map(cat => (
-            <TouchableOpacity 
-              key={cat.id} 
-              style={[styles.chip, categoriaSelecionada?.id === cat.id && styles.chipAtivo]}
-              onPress={() => setCategoriaSelecionada(cat)}
-            >
-              <Text style={[styles.txtChip, categoriaSelecionada?.id === cat.id && { color: '#10B981' }]}>
-                {cat.nome}
-              </Text>
-            </TouchableOpacity>
-          ))}
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        
+        <View style={styles.tipoContainer}>
+          <TouchableOpacity 
+            style={[styles.btnTipo, tipo === 'RECEITA' ? styles.btnReceitaAtivo : styles.btnInativo]}
+            onPress={() => { setTipo('RECEITA'); setCategoriaSelecionada(null); }}
+          >
+            <Text style={[styles.txtTipo, tipo === 'RECEITA' ? { color: '#FFF' } : { color: '#8BAE92' }]}>
+              + Receita (Entrada)
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.btnTipo, tipo === 'DESPESA' ? styles.btnDespesaAtivo : styles.btnInativo]}
+            onPress={() => { setTipo('DESPESA'); setCategoriaSelecionada(null); }}
+          >
+            <Text style={[styles.txtTipo, tipo === 'DESPESA' ? { color: '#FFF' } : { color: '#E89CA3' }]}>
+              - Despesa (Saída)
+            </Text>
+          </TouchableOpacity>
         </View>
-      )}
 
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <Text style={styles.label}>Valor</Text>
+        <View style={styles.inputBox}>
+          <TextInput
+            style={styles.inputValor}
+            placeholder="R$ 0,00"
+            placeholderTextColor="#9CA3AF"
+            keyboardType="numeric"
+            value={valor}
+            onChangeText={setValor}
+          />
+        </View>
+
+        <Text style={styles.label}>Descrição</Text>
+        <View style={styles.inputBox}>
+          <TextInput
+            style={styles.input}
+            placeholder="Ex: Venda no balcão"
+            placeholderTextColor="#9CA3AF"
+            value={descricao}
+            onChangeText={setDescricao}
+          />
+        </View>
+
+        <Text style={styles.label}>Conta de origem / destino</Text>
+        <TouchableOpacity style={styles.dropdownBox} onPress={() => setModalContaVisivel(true)}>
+          <Text style={styles.dropdownText}>{contaSelecionada ? contaSelecionada.nome : 'Selecione...'}</Text>
+          <AntDesign name="caret-down" size={12} color="#6B7280" />
+        </TouchableOpacity>
+
         <Text style={styles.label}>Categoria</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('GerenciarCategorias', { perfilId })}>
-          <Text style={{ color: '#10B981', fontWeight: 'bold', fontSize: 14 }}>Adicionar Categoria</Text>
+        <TouchableOpacity style={styles.dropdownBox} onPress={() => setModalCatVisivel(true)}>
+          <Text style={styles.dropdownText}>{categoriaSelecionada ? categoriaSelecionada.nome : 'Selecione...'}</Text>
+          <AntDesign name="caret-down" size={12} color="#6B7280" />
         </TouchableOpacity>
-      </View>
 
-      <Text style={styles.label}>Conta Bancária</Text>
-      {contas.length === 0 ? (
-        <Text style={styles.alertaVazio}>Nenhuma conta encontrada.</Text>
-      ) : (
-        <View style={styles.rowChips}>
-          {contas.map(c => (
-            <TouchableOpacity 
-              key={c.id} 
-              style={[styles.chip, contaSelecionada?.id === c.id && styles.chipAtivo]}
-              onPress={() => setContaSelecionada(c)}
-            >
-              <Text style={[styles.txtChip, contaSelecionada?.id === c.id && { color: '#10B981' }]}>
-                {c.nome}
-              </Text>
-            </TouchableOpacity>
-          ))}
+        <Text style={styles.label}>Data de vencimento</Text>
+        <View style={[styles.inputBox, { flexDirection: 'row', alignItems: 'center' }]}>
+          <AntDesign name="calendar" size={20} color="#6B7280" style={{ marginRight: 8 }} />
+          <TextInput
+            style={styles.input}
+            placeholder="dd/mm/aaaa"
+            placeholderTextColor="#9CA3AF"
+            keyboardType="number-pad"
+            value={dataVencimento}
+            onChangeText={handleDataChange}
+            maxLength={10}
+          />
         </View>
-      )}
 
-      <TouchableOpacity 
-        style={[styles.btnPrincipal, (contas.length === 0 || categorias.length === 0) && { backgroundColor: '#9CA3AF' }]} 
-        onPress={handleSalvar} 
-        disabled={loadingSalvar || contas.length === 0 || categorias.length === 0}
-      >
-        {loadingSalvar ? <ActivityIndicator color="#FFF" /> : <Text style={styles.btnText}>Salvar Transação</Text>}
-      </TouchableOpacity>
+        <View style={styles.toggleContainer}>
+          <Text style={styles.toggleLabel}>Já foi pago / recebido hoje?</Text>
+          <Switch 
+            value={jaFoiPago} 
+            onValueChange={setJaFoiPago} 
+            trackColor={{ false: '#D1D5DB', true: '#4F46E5' }} 
+          />
+        </View>
 
-      <TouchableOpacity style={styles.btnCancelar} onPress={() => navigation.goBack()}>
-        <Text style={styles.btnCancelarText}>Cancelar</Text>
-      </TouchableOpacity>
-    </ScrollView>
+        <TouchableOpacity style={styles.btnSalvar} onPress={handleSalvar} disabled={salvando}>
+          {salvando ? <ActivityIndicator color="#FFF" /> : <Text style={styles.btnSalvarText}>Salvar</Text>}
+        </TouchableOpacity>
+
+      </ScrollView>
+
+      {/* MODAL: SELECIONAR CONTA */}
+      <Modal visible={modalContaVisivel} transparent={true} animationType="fade">
+        <TouchableOpacity style={styles.modalOverlay} onPress={() => setModalContaVisivel(false)}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Selecione a Conta</Text>
+            {contas.map(conta => (
+              <TouchableOpacity key={conta.id} style={styles.modalItem} onPress={() => { setContaSelecionada(conta); setModalContaVisivel(false); }}>
+                <Text style={styles.modalItemText}>{conta.nome}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* MODAL: SELECIONAR CATEGORIA */}
+      <Modal visible={modalCatVisivel} transparent={true} animationType="fade">
+        <TouchableOpacity style={styles.modalOverlay} onPress={() => setModalCatVisivel(false)}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Selecione a Categoria</Text>
+            <ScrollView style={{ maxHeight: 300 }}>
+              {categoriasFiltradas.length === 0 ? <Text style={{ padding: 16, textAlign: 'center' }}>Nenhuma categoria encontrada.</Text> : null}
+              {categoriasFiltradas.map(cat => (
+                <TouchableOpacity key={cat.id} style={styles.modalItem} onPress={() => { setCategoriaSelecionada(cat); setModalCatVisivel(false); }}>
+                  <Text style={styles.modalItemText}>{cat.nome}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            {/* BOTÃO ADICIONAR NOVA CATEGORIA */}
+            <TouchableOpacity 
+              style={styles.btnAddCategoriaMenu} 
+              onPress={() => { setModalCatVisivel(false); setModalNovaCatVisivel(true); }}
+            >
+              <AntDesign name="plus" size={16} color="#10B981" style={{ marginRight: 8 }} />
+              <Text style={styles.txtAddCategoriaMenu}>Adicionar Categoria</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* MODAL: CRIAR NOVA CATEGORIA */}
+      <Modal visible={modalNovaCatVisivel} transparent={true} animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Nova Categoria ({tipo === 'RECEITA' ? 'Entrada' : 'Saída'})</Text>
+            
+            <View style={{ padding: 16 }}>
+              <Text style={styles.label}>Nome da Categoria</Text>
+              <TextInput
+                style={[styles.inputBox, { marginBottom: 24 }]}
+                placeholder="Ex: Fornecedores"
+                placeholderTextColor="#9CA3AF"
+                value={novaCategoriaNome}
+                onChangeText={setNovaCategoriaNome}
+                autoFocus={true}
+              />
+              
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+                <TouchableOpacity 
+                  style={[styles.btnAcaoModal, { backgroundColor: '#F3F4F6', marginRight: 12 }]} 
+                  onPress={() => { setModalNovaCatVisivel(false); setNovaCategoriaNome(''); }}
+                >
+                  <Text style={{ color: '#4B5563', fontWeight: 'bold' }}>Cancelar</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.btnAcaoModal, { backgroundColor: '#10B981' }]} 
+                  onPress={handleCriarCategoria}
+                  disabled={salvandoCategoria}
+                >
+                  {salvandoCategoria ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Salvar</Text>}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, padding: 24, backgroundColor: '#F9FAFB', paddingTop: 60 },
-  title: { fontSize: 28, fontWeight: 'bold', marginBottom: 24, color: '#111827' },
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
+  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#000' },
+  content: { padding: 24, paddingBottom: 40 },
   
-  rowTipos: { flexDirection: 'row', gap: 12, marginBottom: 24 },
-  btnTipo: { flex: 1, padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#D1D5DB', alignItems: 'center' },
-  btnReceita: { backgroundColor: '#10B981', borderColor: '#10B981' },
-  btnDespesa: { backgroundColor: '#EF4444', borderColor: '#EF4444' },
-  txtTipo: { fontSize: 16, fontWeight: 'bold', color: '#6B7280' },
-  
-  label: { fontSize: 16, color: '#4B5563', marginBottom: 8, fontWeight: '600' },
-  input: { backgroundColor: '#FFF', borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 8, padding: 16, marginBottom: 24, fontSize: 16 },
-  
-  rowChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 },
-  chip: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 8, borderWidth: 1, borderColor: '#D1D5DB', backgroundColor: '#FFF' },
-  chipAtivo: { borderColor: '#10B981', backgroundColor: '#ECFDF5' },
-  txtChip: { fontWeight: '600', color: '#6B7280' },
-  
-  alertaVazio: { color: '#EF4444', marginBottom: 24, fontStyle: 'italic' },
+  tipoContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 },
+  btnTipo: { flex: 1, paddingVertical: 14, borderRadius: 8, alignItems: 'center', marginHorizontal: 4 },
+  btnReceitaAtivo: { backgroundColor: '#7aca8a' },
+  btnDespesaAtivo: { backgroundColor: '#ad0b16' },
+  btnInativo: { backgroundColor: '#F3F4F6' },
+  txtTipo: { fontSize: 14, fontWeight: 'bold' },
 
-  btnPrincipal: { backgroundColor: '#111827', padding: 16, borderRadius: 8, alignItems: 'center', marginTop: 8 },
-  btnText: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
-  btnCancelar: { padding: 16, alignItems: 'center', marginTop: 8 },
-  btnCancelarText: { color: '#EF4444', fontSize: 16, fontWeight: 'bold' }
+  label: { fontSize: 13, fontWeight: '700', color: '#6B7280', marginBottom: 6, marginLeft: 2 },
+  
+  inputBox: { borderWidth: 1, borderColor: '#9CA3AF', borderRadius: 8, paddingHorizontal: 12, height: 50, marginBottom: 16, justifyContent: 'center' },
+  inputValor: { fontSize: 24, fontWeight: 'bold', color: '#6B7280' },
+  input: { fontSize: 14, color: '#374151', flex: 1 },
+
+  dropdownBox: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: '#9CA3AF', borderRadius: 8, paddingHorizontal: 12, height: 50, marginBottom: 16 },
+  dropdownText: { fontSize: 14, color: '#374151' },
+
+  toggleContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, marginBottom: 24 },
+  toggleLabel: { fontSize: 14, fontWeight: 'bold', color: '#000' },
+
+  btnSalvar: { backgroundColor: '#4444FF', height: 54, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  btnSalvarText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 },
+  modalContent: { backgroundColor: '#FFF', borderRadius: 12, overflow: 'hidden' },
+  modalTitle: { fontSize: 16, fontWeight: 'bold', padding: 16, backgroundColor: '#F3F4F6', textAlign: 'center' },
+  modalItem: { padding: 16, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  modalItemText: { fontSize: 16, color: '#374151' },
+  
+  btnAddCategoriaMenu: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 16, backgroundColor: '#ECFDF5', borderTopWidth: 1, borderTopColor: '#D1FAE5' },
+  txtAddCategoriaMenu: { fontSize: 15, fontWeight: 'bold', color: '#10B981' },
+  btnAcaoModal: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 8, justifyContent: 'center', alignItems: 'center' }
 });

@@ -37,7 +37,7 @@ export default function ExtratoScreen({ route, navigation }: any) {
                     .select(`
             id, descricao, valor, tipo, data_pagamento, status, url_comprovante,
             categorias (nome), contas_bancarias (nome)
-          `)
+        `)
                     .in('conta_id', idsContas)
                     .order('data_pagamento', { ascending: false });
 
@@ -164,16 +164,22 @@ export default function ExtratoScreen({ route, navigation }: any) {
                                             <View style={[styles.iconeBg, { backgroundColor: bgTema }]}>
                                                 <AntDesign name={icone} size={16} color={corTema} />
                                             </View>
-                                            <View style={styles.detalhesRow}>
-                                                <Text style={styles.detalheTexto}>
-                                                    {getNomeRelacao(t.categorias)} • {formatarData(t.data_pagamento)}
+
+                                            {/* CORREÇÃO APLICADA AQUI: flex 1 e numberOfLines */}
+                                            <View style={{ flex: 1, paddingRight: 12 }}>
+                                                <Text style={styles.descricao} numberOfLines={1}>
+                                                    {t.descricao}
                                                 </Text>
-                                                {/* Alterado aqui de anexo_url para url_comprovante */}
-                                                {t.url_comprovante && (
-                                                    <TouchableOpacity onPress={() => abrirComprovante(t.url_comprovante)} style={styles.btnAnexo}>
-                                                        <Feather name="paperclip" size={14} color="#3B82F6" />
-                                                    </TouchableOpacity>
-                                                )}
+                                                <View style={styles.detalhesRow}>
+                                                    <Text style={styles.detalheTexto} numberOfLines={1}>
+                                                        {getNomeRelacao(t.categorias)} • {formatarData(t.data_pagamento)}
+                                                    </Text>
+                                                    {t.url_comprovante && (
+                                                        <TouchableOpacity onPress={() => abrirComprovante(t.url_comprovante)} style={styles.btnAnexo}>
+                                                            <Feather name="paperclip" size={14} color="#3B82F6" />
+                                                        </TouchableOpacity>
+                                                    )}
+                                                </View>
                                             </View>
                                         </View>
                                         <View style={styles.infoLadoDireito}>
@@ -242,7 +248,7 @@ const styles = StyleSheet.create({
     detalheTexto: { fontSize: 12, color: '#64748B', fontWeight: '500' },
     btnAnexo: { marginLeft: 8, backgroundColor: '#EFF6FF', padding: 4, borderRadius: 12 },
 
-    infoLadoDireito: { alignItems: 'flex-end', marginLeft: 12 },
+    infoLadoDireito: { alignItems: 'flex-end', marginLeft: 8, minWidth: 80 }, 
     valor: { fontSize: 16, fontWeight: 'bold' },
     tagPendente: { fontSize: 10, fontWeight: 'bold', color: '#D97706', backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, marginTop: 4 },
 

@@ -62,6 +62,16 @@ export default function RetiradaScreen({ route, navigation }: any) {
             return Alert.alert('Atenção', 'Selecione a sua Conta Pessoal. Se não tem nenhuma, volte e crie uma primeiro!');
         }
 
+        // --- NOVA TRAVA DE SEGURANÇA: VERIFICAÇÃO DE SALDO ---
+        const contaOrigem = contasPj.find(c => c.id === contaOrigemId);
+        if (contaOrigem && valorNum > Number(contaOrigem.saldo_atual)) {
+            return Alert.alert(
+                'Saldo Insuficiente', 
+                `Você está tentando retirar um valor maior do que o disponível nesta conta (${Number(contaOrigem.saldo_atual).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}).`
+            );
+        }
+        // -----------------------------------------------------
+
         setProcessando(true);
         try {
             const dataAtual = new Date().toISOString().split('T')[0];
@@ -73,7 +83,7 @@ export default function RetiradaScreen({ route, navigation }: any) {
                 .select('id')
                 .eq('nome', 'Pró-labore')
                 .eq('tipo', 'DESPESA')
-                .eq('perfil_id', perfilPjId) // Filtra pelo perfil da Empresa
+                .eq('perfil_id', perfilPjId) 
                 .single();
 
             if (catDespesaExiste) {
@@ -83,7 +93,7 @@ export default function RetiradaScreen({ route, navigation }: any) {
                     .from('categorias').insert([{
                         nome: 'Pró-labore',
                         tipo: 'DESPESA',
-                        perfil_id: perfilPjId // Envia o ID do Perfil PJ
+                        perfil_id: perfilPjId 
                     }]).select().single();
                 if (errCatD) throw errCatD;
                 categoriaDespesaId = novaCatDespesa.id;
@@ -96,7 +106,7 @@ export default function RetiradaScreen({ route, navigation }: any) {
                 .select('id')
                 .eq('nome', 'Rendimento Empresarial')
                 .eq('tipo', 'RECEITA')
-                .eq('perfil_id', perfilPfId) // Filtra pelo perfil Pessoal
+                .eq('perfil_id', perfilPfId) 
                 .single();
 
             if (catReceitaExiste) {
@@ -106,7 +116,7 @@ export default function RetiradaScreen({ route, navigation }: any) {
                     .from('categorias').insert([{
                         nome: 'Rendimento Empresarial',
                         tipo: 'RECEITA',
-                        perfil_id: perfilPfId // Envia o ID do Perfil PF
+                        perfil_id: perfilPfId 
                     }]).select().single();
                 if (errCatR) throw errCatR;
                 categoriaReceitaId = novaCatReceita.id;
@@ -115,7 +125,7 @@ export default function RetiradaScreen({ route, navigation }: any) {
             // --- 3. REGISTAR A SAÍDA NA EMPRESA (PJ) COM A CATEGORIA ---
             const { error: errDespesa } = await supabase.from('transacoes').insert([{
                 conta_id: contaOrigemId,
-                categoria_id: categoriaDespesaId, // Agora enviamos o ID
+                categoria_id: categoriaDespesaId, 
                 tipo: 'DESPESA',
                 descricao: 'Retirada de Pró-labore',
                 valor: valorNum,
@@ -128,7 +138,7 @@ export default function RetiradaScreen({ route, navigation }: any) {
             // --- 4. REGISTAR A ENTRADA NA CONTA PESSOAL (PF) COM A CATEGORIA ---
             const { error: errReceita } = await supabase.from('transacoes').insert([{
                 conta_id: contaDestinoId,
-                categoria_id: categoriaReceitaId, // Agora enviamos o ID
+                categoria_id: categoriaReceitaId, 
                 tipo: 'RECEITA',
                 descricao: 'Recebimento de Pró-labore',
                 valor: valorNum,
@@ -139,7 +149,6 @@ export default function RetiradaScreen({ route, navigation }: any) {
             if (errReceita) throw errReceita;
 
             // --- 5. ATUALIZAR SALDOS DAS CONTAS ---
-            const contaOrigem = contasPj.find(c => c.id === contaOrigemId);
             const contaDestino = contasPf.find(c => c.id === contaDestinoId);
 
             await supabase.from('contas_bancarias').update({ saldo_atual: Number(contaOrigem.saldo_atual) - valorNum }).eq('id', contaOrigemId);

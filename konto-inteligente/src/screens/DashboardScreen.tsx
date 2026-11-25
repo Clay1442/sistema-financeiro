@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, ScrollView, Modal, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import { supabase } from '../services/supabase';
@@ -7,6 +7,7 @@ import { Feather, AntDesign, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Dimensions } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
+import * as LocalAuthentication from 'expo-local-authentication';
 
 interface PerfilFinanceiro {
   id: string | number;
@@ -22,6 +23,7 @@ interface ContaBancaria {
 
 export default function DashboardScreen({ navigation }: any) {
   const [nomeUsuario, setNomeUsuario] = useState('');
+  const [menuVisivel, setMenuVisivel] = useState(false);
   const [iniciais, setIniciais] = useState('U');
   const [perfis, setPerfis] = useState<PerfilFinanceiro[]>([]);
   const [perfilAtivo, setPerfilAtivo] = useState<PerfilFinanceiro | null>(null);
@@ -48,6 +50,22 @@ export default function DashboardScreen({ navigation }: any) {
     try {
       const userId = await SecureStore.getItemAsync('userToken');
       if (!userId) throw new Error('Sessão expirada.');
+
+      // LÓGICA DE BLOQUEIO BIOMÉTRICO ---
+      const exigeBiometria = await SecureStore.getItemAsync('Konto_Biometria');
+      if (exigeBiometria === 'true') {
+        const auth = await LocalAuthentication.authenticateAsync({
+          promptMessage: 'Desbloquear Konto',
+          fallbackLabel: 'Usar senha',
+          cancelLabel: 'Cancelar',
+        });
+
+        if (!auth.success) {
+          // Se falhar ou cancelar, desloga o usuário por segurança
+          return handleLogout();
+        }
+      }
+      // -----------------------------------------
 
       const { data: usuario, error: errUser } = await supabase
         .from('usuarios')
@@ -118,6 +136,10 @@ export default function DashboardScreen({ navigation }: any) {
     navigation.reset({ index: 0, routes: [{ name: 'Welcome' }] });
   };
 
+  const handleMenuPerfil = () => {
+    setMenuVisivel(true);
+  };
+
   const saldoTotal = contas.reduce((acc, conta) => acc + Number(conta.saldo_atual), 0);
   const formatarMoeda = (valor: number) => valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -137,7 +159,7 @@ export default function DashboardScreen({ navigation }: any) {
   const transacoesReceitas = transacoesDoMes
     .filter(t => t.tipo === 'RECEITA')
     .sort((a, b) => new Date(a.data_pagamento).getTime() - new Date(b.data_pagamento).getTime());
-    
+
   const transacoesDespesas = transacoesDoMes
     .filter(t => t.tipo === 'DESPESA')
     .sort((a, b) => new Date(a.data_pagamento).getTime() - new Date(b.data_pagamento).getTime());
@@ -145,10 +167,10 @@ export default function DashboardScreen({ navigation }: any) {
   // 3. Soma os valores APENAS do mês atual para o cálculo do Pró-labore e gráficos
   const totalReceitas = transacoesReceitas.reduce((acc, t) => acc + Number(t.valor), 0);
   const totalDespesas = transacoesDespesas.reduce((acc, t) => acc + Number(t.valor), 0);
-  
+
   // Lucro do Mês
   const lucroMensal = totalReceitas - totalDespesas;
-  
+
   // Verifica se já existe uma despesa de Pró-labore NESTE MÊS
   const retiradaRealizada = transacoesDespesas.some(t => t.descricao?.includes('Pró-labore'));
 
@@ -180,7 +202,9 @@ export default function DashboardScreen({ navigation }: any) {
 
         {/* CABEÇALHO */}
         <View style={styles.header}>
-          <View style={styles.headerLeft}>
+
+          {/* SECÇÃO CLICÁVEL DO UTILIZADOR */}
+          <TouchableOpacity style={styles.headerLeft} onPress={handleMenuPerfil} activeOpacity={0.7}>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>{iniciais}</Text>
             </View>
@@ -191,7 +215,8 @@ export default function DashboardScreen({ navigation }: any) {
                 <Feather name="chevron-down" size={16} color="#0F172A" style={{ marginLeft: 4, marginTop: 2 }} />
               </View>
             </View>
-          </View>
+          </TouchableOpacity>
+
           <TouchableOpacity onPress={handleLogout} style={styles.btnLogout}>
             <Feather name="log-out" size={20} color="#EF4444" />
           </TouchableOpacity>
@@ -359,13 +384,13 @@ export default function DashboardScreen({ navigation }: any) {
           <>
             {retiradaRealizada ? (
               /* ESTADO 1: JÁ RETIROU NESTE MÊS (MAS PODE RETIRAR MAIS SE HOUVER LUCRO) */
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.cardProLabore, { backgroundColor: '#D1FAE5', borderColor: '#10B981' }]}
                 activeOpacity={lucroMensal > 0 ? 0.7 : 1}
                 onPress={() => {
                   if (lucroMensal > 0) {
-                    navigation.navigate('Retirada', { 
-                      perfilPjId: perfilAtivo.id, 
+                    navigation.navigate('Retirada', {
+                      perfilPjId: perfilAtivo.id,
                       perfilPfId: perfis.find(p => p.tipo === 'PESSOAL')?.id,
                       lucroAtual: lucroMensal // Passa apenas o lucro que sobrou
                     });
@@ -381,8 +406,8 @@ export default function DashboardScreen({ navigation }: any) {
                   <View style={{ flex: 1, paddingRight: 8 }}>
                     <Text style={[styles.tituloProLabore, { color: '#065F46' }]}>Retirada Concluída</Text>
                     <Text style={[styles.subtituloProLabore, { color: '#047857' }]}>
-                      {lucroMensal > 0 
-                        ? `Ainda restam ${formatarMoeda(lucroMensal)} de lucro. Toque para retirar mais.` 
+                      {lucroMensal > 0
+                        ? `Ainda restam ${formatarMoeda(lucroMensal)} de lucro. Toque para retirar mais.`
                         : 'O pró-labore deste mês já foi transferido.'}
                     </Text>
                   </View>
@@ -391,10 +416,10 @@ export default function DashboardScreen({ navigation }: any) {
               </TouchableOpacity>
             ) : lucroMensal > 0 ? (
               /* ESTADO 2: PRIMEIRA RETIRADA DO MÊS */
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.cardProLabore}
-                onPress={() => navigation.navigate('Retirada', { 
-                  perfilPjId: perfilAtivo.id, 
+                onPress={() => navigation.navigate('Retirada', {
+                  perfilPjId: perfilAtivo.id,
                   perfilPfId: perfis.find(p => p.tipo === 'PESSOAL')?.id,
                   lucroAtual: lucroMensal
                 })}
@@ -432,18 +457,20 @@ export default function DashboardScreen({ navigation }: any) {
         ) : (
           <View style={styles.section}>
             {/* MINHAS CONTAS */}
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Minhas contas</Text>
-              <TouchableOpacity>
-                <Text style={styles.linkVerTodas}>Ver todas</Text>
-              </TouchableOpacity>
-            </View>
-
             {contas.length === 0 ? (
               <Text style={styles.emptyText}>Não tem contas cadastradas.</Text>
             ) : (
               contas.map((conta) => (
-                <View key={conta.id} style={styles.contaItem}>
+                <TouchableOpacity
+                  key={conta.id}
+                  style={styles.contaItem}
+                  activeOpacity={0.7}
+                  onPress={() => navigation.navigate('DetalhesConta', {
+                    contaId: conta.id,
+                    nomeConta: conta.nome,
+                    saldoConta: conta.saldo_atual
+                  })}
+                >
                   <View style={styles.contaInfo}>
                     <View style={styles.contaIconBg}>
                       <MaterialCommunityIcons name="bank" size={20} color="#1D4ED8" />
@@ -451,7 +478,7 @@ export default function DashboardScreen({ navigation }: any) {
                     <Text style={styles.contaNome}>{conta.nome}</Text>
                   </View>
                   <Text style={styles.contaSaldo}>{formatarMoeda(Number(conta.saldo_atual))}</Text>
-                </View>
+                </TouchableOpacity>
               ))
             )}
 
@@ -463,8 +490,69 @@ export default function DashboardScreen({ navigation }: any) {
             </TouchableOpacity>
           </View>
         )}
-
       </ScrollView>
+
+      {/* NOVO MENU MODAL (BOTTOM SHEET) */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={menuVisivel}
+        onRequestClose={() => setMenuVisivel(false)}
+      >
+        {/* Fundo escuro clicável para fechar */}
+        <Pressable style={styles.modalOverlay} onPress={() => setMenuVisivel(false)}>
+
+          {/* Conteúdo branco do menu */}
+          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Opções da Conta</Text>
+              <TouchableOpacity onPress={() => setMenuVisivel(false)} style={{ padding: 8, marginRight: -8 }}>
+                <AntDesign name="close" size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalUserCard}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{iniciais}</Text>
+              </View>
+              <View>
+                <Text style={styles.modalUserName}>{nomeUsuario}</Text>
+                <Text style={styles.modalUserEmail}>Gerencie suas informações</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.modalOption}
+              activeOpacity={0.7}
+              onPress={() => {
+                setMenuVisivel(false);
+                navigation.navigate('Perfil');
+              }}
+            >
+              <View style={styles.modalOptionIconBg}>
+                <Feather name="user" size={20} color="#1D4ED8" />
+              </View>
+              <Text style={styles.modalOptionText}>Meu Perfil</Text>
+              <AntDesign name="right" size={16} color="#CBD5E1" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.modalOption, { borderBottomWidth: 0 }]}
+              activeOpacity={0.7}
+              onPress={() => {
+                setMenuVisivel(false);
+                handleLogout();
+              }}
+            >
+              <View style={[styles.modalOptionIconBg, { backgroundColor: '#FEE2E2' }]}>
+                <Feather name="log-out" size={20} color="#EF4444" />
+              </View>
+              <Text style={[styles.modalOptionText, { color: '#EF4444' }]}>Sair da Conta</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -594,4 +682,18 @@ const styles = StyleSheet.create({
   iconeProLabore: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FDE68A', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   tituloProLabore: { fontSize: 16, fontWeight: 'bold', color: '#92400E' },
   subtituloProLabore: { fontSize: 12, color: '#B45309', marginTop: 2 },
+
+  /* ESTILOS DO MODAL (BOTTOM SHEET) */
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.6)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, paddingBottom: 48, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 10 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+  modalTitle: { fontSize: 20, fontWeight: '900', color: '#0F172A' },
+  modalUserCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', padding: 16, borderRadius: 20, marginBottom: 24, borderWidth: 1, borderColor: '#F1F5F9' },
+  modalUserName: { fontSize: 18, fontWeight: 'bold', color: '#0F172A' },
+  modalUserEmail: { fontSize: 13, color: '#64748B', marginTop: 2, fontWeight: '500' },
+  modalOption: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  modalOptionIconBg: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#EFF6FF', justifyContent: 'center', alignItems: 'center', marginRight: 16 },
+  modalOptionText: { flex: 1, fontSize: 16, fontWeight: '700', color: '#0F172A' },
+  badgeBreve: { backgroundColor: '#F1F5F9', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, marginRight: 12 },
+  badgeBreveText: { fontSize: 10, fontWeight: 'bold', color: '#64748B' },
 });

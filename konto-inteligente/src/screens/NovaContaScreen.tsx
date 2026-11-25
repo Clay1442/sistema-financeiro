@@ -64,7 +64,7 @@ export default function NovaContaScreen({ route, navigation }: any) {
       />
 
       <TouchableOpacity style={styles.btnPrincipal} onPress={handleSalvarConta} disabled={loading}>
-        {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.btnText}>Salvar Conta</Text>}
+        {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.btnSalvarText}>Salvar Conta</Text>}
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.btnCancelar} onPress={() => navigation.goBack()}>
@@ -79,7 +79,8 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: 'bold', marginBottom: 24, color: '#111827' },
   label: { fontSize: 16, color: '#4B5563', marginBottom: 8, fontWeight: '600' },
   input: { backgroundColor: '#FFF', borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 8, padding: 16, marginBottom: 24, fontSize: 16 },
-  btnPrincipal: { backgroundColor: '#10B981', padding: 16, borderRadius: 8, alignItems: 'center', marginTop: 16 },
+  btnPrincipal: { backgroundColor: '#4444FF', height: 54, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  btnSalvarText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
   btnText: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
   btnCancelar: { padding: 16, alignItems: 'center', marginTop: 8 },
   btnCancelarText: { color: '#EF4444', fontSize: 16, fontWeight: 'bold' }
